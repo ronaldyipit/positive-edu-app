@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment and secrets (never commit)
+.env
+.env.local
+*.env
+
+# Build / Expo
+.expo/
+dist/
+web-build/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs / debug
+*.log
+npm-debug.log*
+
+# Backend (if you run from root)
+backend/node_modules/
