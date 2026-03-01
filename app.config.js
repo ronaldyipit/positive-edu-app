@@ -10,8 +10,15 @@ module.exports = {
     userInterfaceStyle: "light",
     assetBundlePatterns: ["**/*"],
     ios: { supportsTablet: true },
-    android: {},
-    web: { bundler: "metro", output: "single" }
+    android: {
+      package: "com.positiveedu.companion"
+    },
+    web: { bundler: "metro", output: "single" },
+    extra: {
+      eas: {
+        projectId: "2d7873c8-7bb2-48dd-9c7a-6e75d55f2c98"
+      }
+    }
   },
   extra: {
     firebase: {

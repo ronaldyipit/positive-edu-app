@@ -1,0 +1,25 @@
+# 減少上傳體積與路徑問題，避免 EAS 解壓失敗
+# 不要排除 .git，讓 EAS 用 git 打包可避免 Permission denied
+node_modules/
+.expo/
+*.log
+.env
+.env.*
+!.env.example
+
+# 後端不需打包進 app
+backend/
+
+# 文件與開發用
+*.md
+!README.md
+.cursor/
+PROPOSAL_CHECKLIST.md
+AI_IMPLEMENTATION_NEEDS.md
+
+# 測試與暫存
+__tests__/
+*.test.*
+.coverage/
+tmp/
+temp/
