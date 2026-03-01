@@ -11,7 +11,8 @@ module.exports = {
     assetBundlePatterns: ["**/*"],
     ios: { supportsTablet: true },
     android: {
-      package: "com.positiveedu.companion"
+      package: "com.positiveedu.companion",
+      jsEngine: "jsc"
     },
     web: { bundler: "metro", output: "single" },
     extra: {
