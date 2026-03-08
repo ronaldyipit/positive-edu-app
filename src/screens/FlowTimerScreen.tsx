@@ -25,6 +25,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const STORAGE_KEY = "@flow_timer_data";
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "http://localhost:4000";
 
+const MIN_DURATION_MINUTES = 5;
+
 const DURATIONS = [
   { label: "5 分", minutes: 5 },
   { label: "15 分", minutes: 15 },
@@ -91,12 +93,17 @@ function toWhatsAppPhone(raw: string): string | null {
 export default function FlowTimerScreen() {
   const { user } = useAuth();
   const [selectedIdx, setSelectedIdx] = useState(2);
+  const [customMinutesInput, setCustomMinutesInput] = useState("");
   const [taskName, setTaskName] = useState("");
   const [taskInput, setTaskInput] = useState("");
   const [difficulty, setDifficulty] = useState<"easy" | "match" | "challenge" | null>(null);
   const [sessionLog, setSessionLog] = useState<{ task: string; minutes: number }[]>([]);
 
-  const totalSeconds = DURATIONS[selectedIdx].minutes * 60;
+  const effectiveMinutes =
+    selectedIdx >= 0
+      ? DURATIONS[selectedIdx].minutes
+      : Math.min(999, Math.max(MIN_DURATION_MINUTES, parseInt(customMinutesInput, 10) || MIN_DURATION_MINUTES));
+  const totalSeconds = effectiveMinutes * 60;
   const [remaining, setRemaining] = useState(totalSeconds);
   const [running, setRunning] = useState(false);
   const [xp, setXp] = useState(0);
@@ -112,6 +119,8 @@ export default function FlowTimerScreen() {
   const [showTimeGuessModal, setShowTimeGuessModal] = useState(false);
   const [feltMinutes, setFeltMinutes] = useState<number | null>(null);
   const [showRevealModal, setShowRevealModal] = useState(false);
+  const [flowTimeFeedbackMessage, setFlowTimeFeedbackMessage] = useState<string | null>(null);
+  const [flowTimeFeedbackLoading, setFlowTimeFeedbackLoading] = useState(false);
   const [showArtModal, setShowArtModal] = useState(false);
   const [actualMinutesForReveal, setActualMinutesForReveal] = useState(0);
   const [sessionEndTaskName, setSessionEndTaskName] = useState("");
@@ -163,6 +172,18 @@ export default function FlowTimerScreen() {
     setRemaining(DURATIONS[idx].minutes * 60);
   };
 
+  const handleCustomMinutesChange = (text: string) => {
+    setSelectedIdx(-1);
+    setCustomMinutesInput(text.replace(/[^0-9]/g, ""));
+  };
+
+  useEffect(() => {
+    if (!running && selectedIdx === -1) {
+      const mins = Math.min(999, Math.max(MIN_DURATION_MINUTES, parseInt(customMinutesInput, 10) || MIN_DURATION_MINUTES));
+      setRemaining(mins * 60);
+    }
+  }, [customMinutesInput, selectedIdx, running]);
+
   useEffect(() => {
     if (!running) return;
     nextHapticAtRef.current = randomPulseIntervalSec();
@@ -183,9 +204,9 @@ export default function FlowTimerScreen() {
         if (prev <= 1) {
           clearInterval(id);
           setRunning(false);
-          const earned = DURATIONS[selectedIdx].minutes * 2;
+          const minutes = Math.round(totalSeconds / 60);
+          const earned = minutes * 2;
           const task = taskName.trim() || "自由學習";
-          const minutes = DURATIONS[selectedIdx].minutes;
           setXp((x) => x + earned);
           setCompletedSessions((c) => c + 1);
           setCelebrateTask(task);
@@ -204,13 +225,33 @@ export default function FlowTimerScreen() {
             .then((r) => r.json())
             .then((j) => j?.message && setAiReflection(j.message))
             .catch(() => {});
-          return DURATIONS[selectedIdx].minutes * 60;
+          return totalSeconds;
         }
         return nextRemaining;
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [running, selectedIdx, taskName, totalSeconds, difficulty]);
+  }, [running, taskName, totalSeconds, difficulty]);
+
+  // 心流時差：開啟對比驚喜時向後端取得 AI 回饋
+  useEffect(() => {
+    if (!showRevealModal || feltMinutes === null) return;
+    setFlowTimeFeedbackMessage(null);
+    setFlowTimeFeedbackLoading(true);
+    fetch(`${COACH_API_BASE}/api/flow-time-feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        feltMinutes,
+        actualMinutes: actualMinutesForReveal,
+        task: sessionEndTaskName || undefined
+      })
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => j?.message && setFlowTimeFeedbackMessage(j.message))
+      .catch(() => {})
+      .finally(() => setFlowTimeFeedbackLoading(false));
+  }, [showRevealModal, feltMinutes, actualMinutesForReveal, sessionEndTaskName]);
 
   const handleStart = () => {
     if (running) {
@@ -244,7 +285,7 @@ export default function FlowTimerScreen() {
 
   const displayName = user?.displayName?.trim() || "我";
   const craftMessage = `【${displayName}】正在進入「深潛心流」，預計在另一個維度待一陣子。請稍後再聯繫。`;
-  const minutesForSession = DURATIONS[selectedIdx].minutes;
+  const minutesForSession = effectiveMinutes;
   const safetySmsBody = `我現在進入 ${minutesForSession} 分鐘的「深潛心流」模式，手機將會斷網。結束後我會立刻回覆你。不用擔心！`;
 
   const openSafetySms = () => {
@@ -425,6 +466,21 @@ export default function FlowTimerScreen() {
           </TouchableOpacity>
         ))}
       </View>
+      <View style={styles.customDurationRow}>
+        <Text style={styles.customDurationLabel}>自訂：</Text>
+        <TextInput
+          style={[styles.customDurationInput, selectedIdx === -1 && styles.durationBtnActive, running && styles.durationBtnDisabled]}
+          value={customMinutesInput}
+          onChangeText={handleCustomMinutesChange}
+          onFocus={() => !running && setSelectedIdx(-1)}
+          placeholder="分鐘（至少 5）"
+          placeholderTextColor="#9ca3af"
+          keyboardType="number-pad"
+          maxLength={3}
+          editable={!running}
+        />
+        <Text style={styles.customDurationSuffix}>分鐘</Text>
+      </View>
       {recommendedIdx >= 0 && recommendedIdx !== selectedIdx && !running && (
         <Text style={styles.recommendText}>💡 你較常完成 {DURATIONS[recommendedIdx].label}，這次也可以試試</Text>
       )}
@@ -458,7 +514,7 @@ export default function FlowTimerScreen() {
           <Text style={styles.celebrateText}>
             🎉 完成！{celebrateTask ? `「${celebrateTask}」` : ""}
           </Text>
-          <Text style={styles.celebrateXp}>+{DURATIONS[selectedIdx].minutes * 2} XP 已獲得</Text>
+          <Text style={styles.celebrateXp}>+{effectiveMinutes * 2} XP 已獲得</Text>
           {aiReflection ? <Text style={styles.celebrateAi}>💬 {aiReflection}</Text> : null}
         </Animated.View>
       )}
@@ -587,11 +643,15 @@ export default function FlowTimerScreen() {
                 <Text style={styles.revealText}>你覺得：{feltMinutes} 分鐘</Text>
                 <Text style={styles.revealText}>實際：{actualMinutesForReveal} 分鐘</Text>
                 <Text style={styles.revealMessage}>
-                  {actualMinutesForReveal > feltMinutes
-                    ? `哇！剛才你進入了深層心流。你偷走了 ${actualMinutesForReveal - feltMinutes} 分鐘的焦慮，並把它轉化成了純粹的創造力。這就是你的「超能力狀態」。`
-                    : actualMinutesForReveal < feltMinutes
-                      ? "時間感很準！你專注在當下，心流讓這段時間過得充實。"
-                      : "你與時間同步，心流讓這段體驗剛剛好。"}
+                  {flowTimeFeedbackLoading
+                    ? "正在根據你的心流時差生成回饋…"
+                    : flowTimeFeedbackMessage
+                      ? flowTimeFeedbackMessage
+                      : actualMinutesForReveal > feltMinutes
+                        ? `哇！剛才你進入了深層心流。你偷走了 ${actualMinutesForReveal - feltMinutes} 分鐘的焦慮，並把它轉化成了純粹的創造力。這就是你的「超能力狀態」。`
+                        : actualMinutesForReveal < feltMinutes
+                          ? "時間感很準！你專注在當下，心流讓這段時間過得充實。"
+                          : "你與時間同步，心流讓這段體驗剛剛好。"}
                 </Text>
                 <TouchableOpacity style={[styles.button, styles.buttonStart]} onPress={() => { setShowRevealModal(false); setShowArtModal(true); }}>
                   <Text style={styles.buttonText}>看我的心流畫作</Text>
@@ -723,6 +783,21 @@ const styles = StyleSheet.create({
   durationBtnDisabled: { opacity: 0.4 },
   durationText: { fontSize: 14, color: "#6b7280", fontWeight: "600" },
   durationTextActive: { color: "#d56c2f" },
+  customDurationRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 12, gap: 8 },
+  customDurationLabel: { fontSize: 14, color: "#6b7280", fontWeight: "600" },
+  customDurationInput: {
+    width: 72,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: "#d1d5db",
+    backgroundColor: "#fff",
+    fontSize: 14,
+    color: "#111827",
+    textAlign: "center"
+  },
+  customDurationSuffix: { fontSize: 14, color: "#6b7280" },
   recommendText: { fontSize: 12, color: "#b45309", textAlign: "center", marginBottom: 8 },
   // Timer ring
   svgWrap: { alignSelf: "center", justifyContent: "center", alignItems: "center", marginBottom: 8 },

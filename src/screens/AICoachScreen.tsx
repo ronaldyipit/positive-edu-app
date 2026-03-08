@@ -51,6 +51,28 @@ type Message = {
   text: string;
 };
 
+/** 把訊息中的 **文字** 拆成片段，方便用粗體顯示 */
+function parseBoldSegments(str: string): { text: string; bold: boolean }[] {
+  const parts: { text: string; bold: boolean }[] = [];
+  let remaining = str;
+  while (remaining.length > 0) {
+    const i = remaining.indexOf("**");
+    if (i === -1) {
+      parts.push({ text: remaining, bold: false });
+      break;
+    }
+    if (i > 0) parts.push({ text: remaining.slice(0, i), bold: false });
+    const j = remaining.indexOf("**", i + 2);
+    if (j === -1) {
+      parts.push({ text: remaining.slice(i), bold: false });
+      break;
+    }
+    parts.push({ text: remaining.slice(i + 2, j), bold: true });
+    remaining = remaining.slice(j + 2);
+  }
+  return parts;
+}
+
 // Use .env EXPO_PUBLIC_COACH_API_URL for backend URL (e.g. http://192.168.68.120:4000 on LAN).
 // Default: localhost so backend runs on same machine.
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "http://localhost:4000";
@@ -193,8 +215,8 @@ export default function AICoachScreen() {
       .join("、");
 
     const intro = selectedStrengths.length > 0
-      ? `你好！我是 AI 正向心態教練 🌱\n\n你選擇了你的核心優勢：**${strengthLabels}**。\n\n我會在對話中幫你善用這些優勢來面對挑戰。今天你想談什麼？`
-      : "你好！我是 AI 正向心態教練 🌱\n\n今天你想談什麼？可以直接輸入，或點下面的情緒按鈕快速開始。";
+      ? `你好！我是 AI 正向心態教練 🌱\n\n你選擇了你的核心優勢：**${strengthLabels}**。\n\n我會在對話中幫你善用這些優勢來面對挑戰。今天你想談什麼？若一時未能描述清楚，可從上方情緒按鈕選一個開始對話。`
+      : "你好！我是 AI 正向心態教練 🌱\n\n今天你想談什麼？若一時未能描述清楚，可從上方情緒按鈕選一個開始對話；或直接輸入。";
 
     setMessages([{ id: "intro", from: "coach", text: intro }]);
     setScreen("chat");
@@ -409,7 +431,7 @@ export default function AICoachScreen() {
             );
           })}
           <TouchableOpacity onPress={() => setScreen("strengths-select")} style={styles.editStrengthsBtn}>
-            <Text style={styles.editStrengthsBtnText}>更改</Text>
+            <Text style={styles.editStrengthsBtnText}>更改性格優勢</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -446,7 +468,15 @@ export default function AICoachScreen() {
             )}
             <View style={[styles.bubble, m.from === "user" ? styles.userBubble : styles.coachBubble]}>
               <Text style={[styles.bubbleText, m.from === "user" && styles.userBubbleText]}>
-                {m.text}
+                {m.from === "coach"
+                  ? parseBoldSegments(m.text).map((seg, i) =>
+                      seg.bold ? (
+                        <Text key={i} style={[styles.bubbleText, styles.bubbleTextBold]}>{seg.text}</Text>
+                      ) : (
+                        seg.text
+                      )
+                    )
+                  : m.text}
               </Text>
             </View>
             {m.from === "user" && (
@@ -644,6 +674,7 @@ const styles = StyleSheet.create({
     shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4, elevation: 1
   },
   bubbleText: { fontSize: 14, color: "#111827", lineHeight: 20 },
+  bubbleTextBold: { fontWeight: "700" },
   userBubbleText: { color: "#fff" },
   // Input
   inputRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, gap: 8 },

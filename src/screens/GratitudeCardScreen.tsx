@@ -11,9 +11,10 @@ import {
   Image
 } from "react-native";
 import ViewShot from "react-native-view-shot";
+import * as Sharing from "expo-sharing";
+import * as IntentLauncher from "expo-intent-launcher";
 import { AppBackground } from "../components/AppBackground";
 import * as MediaLibrary from "expo-media-library";
-import * as Sharing from "expo-sharing";
 
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "http://localhost:4000";
 
@@ -71,9 +72,16 @@ export default function GratitudeCardScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recipient: recipient.trim(), keyword: keyword.trim() })
       });
-      const json = await res.json();
-      if (json?.text) setGeneratedText(json.text);
-    } catch {}
+      const json = res.ok ? await res.json().catch(() => ({})) : {};
+      if (json?.text) {
+        setGeneratedText(json.text);
+      } else {
+        // API 未實作或失敗時改用本地模板，避免 404 且按鈕仍有作用
+        setGeneratedText(CARD_TEMPLATES[templateIdx](recipient.trim(), keyword.trim()));
+      }
+    } catch {
+      setGeneratedText(CARD_TEMPLATES[templateIdx](recipient.trim(), keyword.trim()));
+    }
     setLoadingAi(false);
   };
 
@@ -87,9 +95,11 @@ export default function GratitudeCardScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recipient: recipient.trim(), keyword: keyword.trim() })
       });
-      const json = await res.json();
+      const json = res.ok ? await res.json().catch(() => ({})) : {};
       if (json?.imageUrl) setAiImageUrl(json.imageUrl);
-    } catch {}
+    } catch {
+      // 插圖 API 未實作或失敗時不顯示插圖，卡片仍可正常使用
+    }
     setLoadingImage(false);
   };
 
@@ -152,10 +162,26 @@ export default function GratitudeCardScreen() {
         Alert.alert("不支援", "此裝置不支援分享功能。");
         return;
       }
-      await Sharing.shareAsync(uri, {
-        mimeType: "image/png",
-        dialogTitle: "分享感恩卡"
-      });
+      if (Platform.OS === "android") {
+        try {
+          await IntentLauncher.startActivityAsync("android.intent.action.SEND", {
+            type: "image/png",
+            data: uri,
+            packageName: "com.whatsapp",
+            extra: { "android.intent.extra.STREAM": uri }
+          });
+        } catch {
+          await Sharing.shareAsync(uri, {
+            mimeType: "image/png",
+            dialogTitle: "分享感恩卡到 WhatsApp（選擇聯絡人）"
+          });
+        }
+      } else {
+        await Sharing.shareAsync(uri, {
+          mimeType: "image/png",
+          dialogTitle: "分享感恩卡到 WhatsApp（選擇聯絡人）"
+        });
+      }
     } catch {
       Alert.alert("分享失敗", "請再試一次。");
     } finally {
@@ -252,15 +278,29 @@ export default function GratitudeCardScreen() {
             </View>
           </ViewShot>
 
-          {!aiImageUrl && (
-            <TouchableOpacity
-              style={[styles.generateBtnAi, { marginBottom: 8 }, (!recipient.trim() || !keyword.trim() || loadingImage) && styles.btnDisabled]}
-              onPress={handleGenerateAiImage}
-              disabled={!recipient.trim() || !keyword.trim() || loadingImage}
-            >
-              <Text style={styles.generateBtnText}>{loadingImage ? "生成中…" : "🖼 AI 插圖（選填）"}</Text>
-            </TouchableOpacity>
-          )}
+          {/* 可修訂內文（與卡片同步，儲存／分享時以修訂後為準） */}
+          <Text style={styles.editLabel}>✏️ 可修訂內文</Text>
+          <TextInput
+            style={[styles.cardBodyInput, { color: theme.body, borderColor: theme.border }]}
+            value={generatedText ?? ""}
+            onChangeText={setGeneratedText}
+            placeholder="在此編輯感恩卡內文…"
+            placeholderTextColor="#9ca3af"
+            multiline
+            textAlignVertical="top"
+          />
+
+          {/* AI 插圖：無圖時顯示「AI 插圖（選填）」，有圖時顯示「重新生成插圖」 */}
+          <TouchableOpacity
+            style={[styles.generateBtnAi, { marginBottom: 4 }, (!recipient.trim() || !keyword.trim() || loadingImage) && styles.btnDisabled]}
+            onPress={handleGenerateAiImage}
+            disabled={!recipient.trim() || !keyword.trim() || loadingImage}
+          >
+            <Text style={styles.generateBtnText}>
+              {loadingImage ? "生成中…（約需 2–3 分鐘）" : aiImageUrl ? "🖼 重新生成插圖" : "🖼 AI 插圖（選填）"}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.imageHint}>⏱ 生成插圖約需 2–3 分鐘，請耐心等候。</Text>
 
           {/* 操作按鈕 */}
           <View style={styles.saveRow}>
@@ -281,7 +321,7 @@ export default function GratitudeCardScreen() {
           </View>
 
           <Text style={styles.hintText}>
-            儲存後可直接傳到 WhatsApp、IG 給 {recipient}。
+            按分享後會開啟 WhatsApp，在 WhatsApp 內選擇聯絡人即可傳送給 {recipient || "對方"}。
           </Text>
         </>
       )}
@@ -393,6 +433,18 @@ const styles = StyleSheet.create({
   cardBody: { fontSize: 16, lineHeight: 26, textAlign: "center", marginBottom: 16 },
   cardDivider: { height: 1, width: "60%", marginBottom: 12, opacity: 0.5 },
   cardFooter: { fontSize: 11, fontWeight: "600", letterSpacing: 0.5, opacity: 0.7 },
+  editLabel: { fontSize: 13, fontWeight: "600", color: "#374151", marginBottom: 6 },
+  cardBodyInput: {
+    borderWidth: 1.5,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    lineHeight: 24,
+    minHeight: 100,
+    backgroundColor: "#fefce8"
+  },
+  imageHint: { fontSize: 12, color: "#6b7280", marginBottom: 12 },
   // Save / Share
   saveRow: { flexDirection: "row", gap: 10, marginBottom: 8 },
   saveBtn: {

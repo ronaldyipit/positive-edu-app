@@ -41,6 +41,7 @@ export default function SomaticShredderScreen() {
   const [breathPhaseIdx, setBreathPhaseIdx] = useState(0);
   const [breathCountdown, setBreathCountdown] = useState(4);
   const [breathCycles, setBreathCycles] = useState(0);
+  const [breathPaused, setBreathPaused] = useState(false);
   const [aiClosing, setAiClosing] = useState("");
   const [intensityFeedback, setIntensityFeedback] = useState("");
   const [shredPieces] = useState(() =>
@@ -57,13 +58,16 @@ export default function SomaticShredderScreen() {
   const shakeBarAnim = useRef(new Animated.Value(0)).current;
   const breathAnimRef = useRef<ReturnType<typeof Animated.timing> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startBreathingRef = useRef<(phaseIdx: number, cycles: number) => void>(() => {});
+  const pausedStateRef = useRef({ phaseIdx: 0, cycles: 0, remaining: 4 });
   const shakeAccumRef = useRef(0);
   const lastShakeRef = useRef(0);
   const maxMagnitudeRef = useRef(0);
 
-  // ── 加速度計監聽 ──────────────────────────────────────────
+  // ── 加速度計監聽（僅原生 App；Web 用下方「點擊粉碎」按鈕）──────────────────────────────────────────
   useEffect(() => {
     if (step !== "shake") return;
+    if (Platform.OS === "web") return;
 
     Accelerometer.setUpdateInterval(100);
     const sub = Accelerometer.addListener(({ x, y, z }) => {
@@ -123,44 +127,75 @@ export default function SomaticShredderScreen() {
   }, [shredPieces]);
 
   // ── 4-7-8 呼吸引導 ───────────────────────────────────────
-  const startBreathing = useCallback((phaseIdx: number, cycles: number) => {
+  const advanceToNextPhase = useCallback((phaseIdx: number, cycles: number) => {
+    const nextPhase = (phaseIdx + 1) % BREATH_PHASES.length;
+    const newCycles = nextPhase === 0 ? cycles + 1 : cycles;
+    setBreathCycles(newCycles);
+    if (newCycles >= 3) {
+      setStep("done");
+      fetch(`${COACH_API_BASE}/api/somatic-done`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+        .then((r) => r.json())
+        .then((j) => j?.message && setAiClosing(j.message))
+        .catch(() => {});
+      return;
+    }
+    startBreathingRef.current(nextPhase, newCycles);
+  }, []);
+
+  const startBreathing = useCallback((phaseIdx: number, cycles: number, remainingOverride?: number) => {
+    startBreathingRef.current = (p, c) => startBreathing(p, c);
     const phase = BREATH_PHASES[phaseIdx];
+    const durationSec = remainingOverride ?? phase.seconds;
     setBreathPhaseIdx(phaseIdx);
-    setBreathCountdown(phase.seconds);
+    setBreathCountdown(durationSec);
 
     breathAnimRef.current = Animated.timing(circleAnim, {
       toValue: phase.targetSize,
-      duration: phase.seconds * 1000,
+      duration: durationSec * 1000,
       useNativeDriver: false,
       easing: Easing.inOut(Easing.sine)
     });
-    breathAnimRef.current.start(({ finished }) => {
-      if (!finished) return;
-      const nextPhase = (phaseIdx + 1) % BREATH_PHASES.length;
-      const newCycles = nextPhase === 0 ? cycles + 1 : cycles;
-      setBreathCycles(newCycles);
-      if (newCycles >= 3) {
-        setStep("done");
-        fetch(`${COACH_API_BASE}/api/somatic-done`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
-          .then((r) => r.json())
-          .then((j) => j?.message && setAiClosing(j.message))
-          .catch(() => {});
-        return;
-      }
-      startBreathing(nextPhase, newCycles);
-    });
+    breathAnimRef.current.start(() => {});
 
-    // 倒數計時
     if (countdownRef.current) clearInterval(countdownRef.current);
-    let remaining = phase.seconds;
+    let remaining = durationSec;
     countdownRef.current = setInterval(() => {
       remaining -= 1;
       setBreathCountdown(remaining);
       if (remaining <= 0) {
-        clearInterval(countdownRef.current!);
+        if (countdownRef.current) {
+          clearInterval(countdownRef.current);
+          countdownRef.current = null;
+        }
+        advanceToNextPhase(phaseIdx, cycles);
       }
     }, 1000);
   }, [circleAnim]);
+
+  const handlePauseBreath = useCallback(() => {
+    breathAnimRef.current?.stop();
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    pausedStateRef.current = {
+      phaseIdx: breathPhaseIdx,
+      cycles: breathCycles,
+      remaining: breathCountdown
+    };
+    setBreathPaused(true);
+  }, [breathPhaseIdx, breathCycles, breathCountdown]);
+
+  const handleResumeBreath = useCallback(() => {
+    const { phaseIdx, cycles, remaining } = pausedStateRef.current;
+    if (remaining <= 0) {
+      advanceToNextPhase(phaseIdx, cycles);
+      setBreathPaused(false);
+      return;
+    }
+    setBreathPaused(false);
+    startBreathing(phaseIdx, cycles, remaining);
+  }, [advanceToNextPhase, startBreathing]);
 
   useEffect(() => {
     return () => {
@@ -182,6 +217,7 @@ export default function SomaticShredderScreen() {
     setBreathPhaseIdx(0);
     setBreathCycles(0);
     setBreathCountdown(4);
+    setBreathPaused(false);
     setAiClosing("");
     setIntensityFeedback("");
   };
@@ -311,6 +347,16 @@ export default function SomaticShredderScreen() {
                 ? "三次呼吸完成！副交感神經已啟動，好好感受這份平靜 🌿"
                 : `第 ${breathCycles + 1} / 3 次`}
             </Text>
+
+            {/* 暫停 / 繼續 */}
+            {step === "breathe" && (
+              <TouchableOpacity
+                style={[styles.primaryBtn, styles.pauseBtn]}
+                onPress={breathPaused ? handleResumeBreath : handlePauseBreath}
+              >
+                <Text style={styles.primaryBtnText}>{breathPaused ? "▶ 繼續" : "⏸ 暫停"}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </>
       )}
@@ -366,6 +412,7 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.35 },
   primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  pauseBtn: { marginTop: 12 },
   // Shake step
   shakeSection: { alignItems: "center", paddingVertical: 8 },
   shakeTitle: { fontSize: 20, fontWeight: "700", color: "#111827", marginBottom: 6, textAlign: "center" },

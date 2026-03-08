@@ -13,8 +13,9 @@ import {
 import { doc, setDoc } from "firebase/firestore";
 import { Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
-import Constants from "expo-constants";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { auth } from "../config/firebase";
 import { db } from "../config/firebase";
 
@@ -35,8 +36,14 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const extra = (Constants.expoConfig as {
-  extra?: { firebase?: { webClientId?: string } };
-})?.extra?.firebase;
+  extra?: {
+    firebase?: { webClientId?: string };
+    googleWebClientId?: string;
+    googleAndroidClientId?: string;
+    googleIosClientId?: string;
+    expoAuthRedirectUri?: string;
+  };
+})?.extra;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -44,12 +51,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // expo-auth-session — 用於 iOS / Android（原生）
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: extra?.webClientId ?? process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
-  });
+  // Expo Go 時改用 auth.expo.io 作為 redirect，Google 才接受（須在 Console 已授權的重新導向 URI 加入該網址）
+  const expoGoRedirectUri =
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+      ? (() => {
+          try {
+            const url = AuthSession.getRedirectUrl();
+            if (url && !url.startsWith("exp://")) return url;
+          } catch {
+            // getRedirectUrl() 在部分裝置會因 originalFullName 未設定而拋錯
+          }
+          return extra?.expoAuthRedirectUri ?? process.env.EXPO_PUBLIC_EXPO_AUTH_REDIRECT_URI;
+        })()
+      : undefined;
+
+  // expo-auth-session — 用於 iOS / Android（原生）；client ID 優先用 app.config.js extra（build 時寫入）
+  const [request, response, promptAsync] = Google.useAuthRequest(
+    {
+      webClientId: extra?.googleWebClientId ?? extra?.firebase?.webClientId ?? process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+      iosClientId: extra?.googleIosClientId ?? (process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || extra?.firebase?.webClientId),
+      androidClientId: extra?.googleAndroidClientId ?? (process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || extra?.firebase?.webClientId),
+      ...(expoGoRedirectUri ? { redirectUri: expoGoRedirectUri } : {})
+    }
+  );
 
   useEffect(() => {
     if (!auth) {
@@ -78,7 +102,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
         .finally(() => setGoogleLoading(false));
     } else if (response?.type === "error") {
-      setAuthError("Google 登入失敗，請再試一次。");
+      const params = (response as { params?: { error?: string } }).params;
+      const code = params?.error ?? "";
+      if (code.includes("invalid_client") || code.includes("access_denied")) {
+        setAuthError("Google OAuth 設定錯誤，請檢查 Client ID 與 Redirect URI。詳見 docs/GOOGLE_OAUTH_SETUP.md");
+      } else {
+        setAuthError("Google 登入失敗，請再試一次。");
+      }
       setGoogleLoading(false);
     }
   }, [response]);
@@ -141,13 +171,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const provider = new GoogleAuthProvider();
         await signInWithPopup(auth, provider);
       } else {
-        // iOS / Android：使用 expo-auth-session
+        // iOS / Android：使用 expo-auth-session（App 內開啟 OAuth，不另開瀏覽器）
         if (!request) {
           setAuthError("Google 登入尚未準備好，請稍後再試。");
           setGoogleLoading(false);
           return;
         }
-        await promptAsync();
+        await promptAsync({
+          // Android：不建立新 task，在 App 內以 Chrome Custom Tab 顯示登入頁
+          ...(Platform.OS === "android" && { createTask: false }),
+        });
         // 結果由上面的 useEffect 處理，所以這裡不 setGoogleLoading(false)
         return;
       }

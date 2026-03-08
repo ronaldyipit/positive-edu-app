@@ -70,3 +70,11 @@ APK 輸出位置：`android/app/build/outputs/apk/release/app-release.apk`
 
 - `eas.json` 已設定 `buildType: "apk"`，產出為 **APK**（非 AAB）。
 - 若之後要上架 Google Play，可改為 `"buildType": "app-bundle"` 產生 AAB。
+
+---
+
+## 若出現「jsc-android」或 JitPack「Read timed out」
+
+1. **已加入 config plugin**：`plugins/withAndroidJscResolve.js` 會在 prebuild 時把 Gradle 的 HTTP 連線／讀取逾時調高為 3 分鐘，減少向 JitPack 拉取 `maven-metadata.xml` 時逾時。
+2. **先重試建置**：網路或 JitPack 不穩時常是暫時的，多跑幾次 `eas build --platform android --profile preview` 有時就會成功。
+3. 若仍失敗，可檢查 EAS 建置日誌是否為其他錯誤，或暫時改用本機建置（方法二）。
