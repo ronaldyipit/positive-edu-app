@@ -12,10 +12,8 @@ module.exports = {
     assetBundlePatterns: ["**/*"],
     ios: { supportsTablet: true },
     android: {
-      package: "com.positiveedu.companion",
-      // Use JSC so EAS Build doesn't need hermesc (avoids "problem occurred starting process").
-      // Hermes remains default on iOS. If JitPack times out, consider a custom image or retry.
-      jsEngine: "jsc"
+      package: "com.positiveedu.companion"
+      // 使用預設 Hermes，避免從 JitPack 下載 jsc-android 導致逾時
     },
     plugins: [],
     web: { bundler: "metro", output: "single" },
