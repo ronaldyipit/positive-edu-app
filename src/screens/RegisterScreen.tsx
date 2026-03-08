@@ -7,12 +7,22 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  Image,
+  Modal,
+  ScrollView
 } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
+import { AppBackground } from "../components/AppBackground";
+import { Ionicons } from "@expo/vector-icons";
+
+const GRADES = ["中一", "中二", "中三", "中四", "中五", "中六"];
 
 export default function RegisterScreen({ navigation }: { navigation: { goBack: () => void } }) {
   const { signUp, authError, clearAuthError } = useAuth();
+  const [displayName, setDisplayName] = useState("");
+  const [grade, setGrade] = useState<string | null>(null);
+  const [gradeModalVisible, setGradeModalVisible] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -26,6 +36,14 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
   const handleRegister = async () => {
     setLocalError(null);
     clearAuthError();
+    if (!displayName.trim()) {
+      setLocalError("請輸入用戶名稱。");
+      return;
+    }
+    if (!grade) {
+      setLocalError("請選擇年級。");
+      return;
+    }
     if (!email.trim()) {
       setLocalError("請輸入電子郵件。");
       return;
@@ -44,7 +62,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
     }
     setLoading(true);
     try {
-      await signUp(email.trim(), password);
+      await signUp(email.trim(), password, displayName.trim(), grade);
     } catch {
       // authError 由 AuthContext 設定
     } finally {
@@ -59,9 +77,75 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <AppBackground variant="auth">
       <View style={styles.card}>
+        <Image
+          source={require("../../assets/img/AppLogo.png")}
+          style={styles.appLogo}
+          resizeMode="contain"
+        />
         <Text style={styles.title}>建立帳號</Text>
-        <Text style={styles.subtitle}>註冊後即可使用所有功能</Text>
+        <Text style={styles.subtitle}>填寫簡單資料，註冊後即可使用所有功能</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="用戶名稱"
+          placeholderTextColor="#9ca3af"
+          value={displayName}
+          onChangeText={(t) => {
+            setDisplayName(t);
+            setLocalError(null);
+            clearAuthError();
+          }}
+          autoCapitalize="words"
+        />
+        <TouchableOpacity
+          style={styles.dropdown}
+          onPress={() => setGradeModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.dropdownText, !grade && styles.dropdownPlaceholder]}>
+            {grade || "請選擇年級"}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color="#78716c" />
+        </TouchableOpacity>
+
+        <Modal
+          visible={gradeModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setGradeModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setGradeModalVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.modalContent}
+              activeOpacity={1}
+              onPress={() => {}}
+            >
+              <Text style={styles.modalTitle}>選擇年級</Text>
+              <ScrollView style={styles.gradeList}>
+                {GRADES.map((g) => (
+                  <TouchableOpacity
+                    key={g}
+                    style={[styles.gradeOption, grade === g && styles.gradeOptionActive]}
+                    onPress={() => {
+                      setGrade(g);
+                      setGradeModalVisible(false);
+                      setLocalError(null);
+                    }}
+                  >
+                    <Text style={[styles.gradeOptionText, grade === g && styles.gradeOptionTextActive]}>{g}</Text>
+                    {grade === g && <Ionicons name="checkmark" size={20} color="#d56c2f" />}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         <TextInput
           style={styles.input}
@@ -125,6 +209,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
           <Text style={styles.linkText}>已有帳號？返回登入</Text>
         </TouchableOpacity>
       </View>
+      </AppBackground>
     </KeyboardAvoidingView>
   );
 }
@@ -133,34 +218,39 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
-    padding: 24,
-    backgroundColor: "#f0f9ff"
+    padding: 24
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderRadius: 16,
     padding: 24,
-    shadowColor: "#000",
+    shadowColor: "#d56c2f",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
     elevation: 3
   },
-  title: { fontSize: 24, fontWeight: "700", color: "#0f172a", marginBottom: 4, textAlign: "center" },
-  subtitle: { fontSize: 14, color: "#64748b", marginBottom: 20, textAlign: "center" },
+  appLogo: {
+    width: 88,
+    height: 88,
+    alignSelf: "center",
+    marginBottom: 12
+  },
+  title: { fontSize: 24, fontWeight: "700", color: "#1c1917", marginBottom: 4, textAlign: "center" },
+  subtitle: { fontSize: 14, color: "#78716c", marginBottom: 20, textAlign: "center" },
   input: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#fde68a",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
     marginBottom: 12,
-    backgroundColor: "#f8fafc"
+    backgroundColor: "#fffbeb"
   },
   error: { color: "#dc2626", fontSize: 13, marginBottom: 8 },
   button: {
-    backgroundColor: "#2563eb",
+    backgroundColor: "#d56c2f",
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
@@ -169,5 +259,46 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.7 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   link: { marginTop: 16, alignItems: "center" },
-  linkText: { color: "#2563eb", fontSize: 14 }
+  linkText: { color: "#d56c2f", fontSize: 14 },
+  // 年級下拉
+  dropdown: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    backgroundColor: "#fffbeb"
+  },
+  dropdownText: { fontSize: 16, color: "#1c1917" },
+  dropdownPlaceholder: { color: "#9ca3af" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    padding: 24
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    maxHeight: 320
+  },
+  modalTitle: { fontSize: 16, fontWeight: "600", color: "#1c1917", marginBottom: 12 },
+  gradeList: { maxHeight: 240 },
+  gradeOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 4
+  },
+  gradeOptionActive: { backgroundColor: "#fff7ed" },
+  gradeOptionText: { fontSize: 16, color: "#374151" },
+  gradeOptionTextActive: { fontWeight: "600", color: "#d56c2f" }
 });

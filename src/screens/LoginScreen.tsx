@@ -7,9 +7,11 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  Image
 } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
+import { AppBackground } from "../components/AppBackground";
 
 export default function LoginScreen({
   navigation
@@ -45,8 +47,14 @@ export default function LoginScreen({
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <AppBackground variant="auth">
       <View style={styles.card}>
-        <Text style={styles.title}>正向教育夥伴</Text>
+        <Image
+          source={require("../../assets/img/AppLogo.png")}
+          style={styles.appLogo}
+          resizeMode="contain"
+        />
+        <Text style={styles.title}>正發光</Text>
         <Text style={styles.subtitle}>建立你的正向成長習慣</Text>
 
         {/* Google 登入（主要按鈕） */}
@@ -56,10 +64,14 @@ export default function LoginScreen({
           disabled={isAnyLoading}
         >
           {googleLoading ? (
-            <ActivityIndicator color="#1f2937" />
+            <ActivityIndicator color="#d56c2f" />
           ) : (
             <View style={styles.googleRow}>
-              <Text style={styles.googleIcon}>G</Text>
+              <Image
+                source={require("../../assets/img/Google Logo.png")}
+                style={styles.googleLogo}
+                resizeMode="contain"
+              />
               <Text style={styles.googleText}>以 Google 帳號登入</Text>
             </View>
           )}
@@ -123,6 +135,7 @@ export default function LoginScreen({
           <Text style={styles.linkText}>還沒有帳號？按此註冊</Text>
         </TouchableOpacity>
       </View>
+      </AppBackground>
     </KeyboardAvoidingView>
   );
 }
@@ -131,35 +144,40 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
-    padding: 24,
-    backgroundColor: "#f0f9ff"
+    padding: 24
   },
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#ffffff",
     borderRadius: 16,
     padding: 24,
-    shadowColor: "#000",
+    shadowColor: "#d56c2f",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
     elevation: 3
+  },
+  appLogo: {
+    width: 88,
+    height: 88,
+    alignSelf: "center",
+    marginBottom: 12
   },
   title: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#0f172a",
+    color: "#1c1917",
     marginBottom: 4,
     textAlign: "center"
   },
   subtitle: {
     fontSize: 14,
-    color: "#64748b",
+    color: "#78716c",
     marginBottom: 20,
     textAlign: "center"
   },
   googleButton: {
     borderWidth: 1.5,
-    borderColor: "#e2e8f0",
+    borderColor: "#fde68a",
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
@@ -170,16 +188,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center"
   },
-  googleIcon: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#4285F4",
+  googleLogo: {
+    width: 22,
+    height: 22,
     marginRight: 10
   },
   googleText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1f2937"
+    color: "#1c1917"
   },
   divider: {
     flexDirection: "row",
@@ -189,26 +206,26 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "#e2e8f0"
+    backgroundColor: "#fde68a"
   },
   dividerText: {
     marginHorizontal: 10,
     fontSize: 13,
-    color: "#9ca3af"
+    color: "#b45309"
   },
   input: {
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#fde68a",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
     marginBottom: 12,
-    backgroundColor: "#f8fafc"
+    backgroundColor: "#fffbeb"
   },
   error: { color: "#dc2626", fontSize: 13, marginBottom: 8 },
   emailButton: {
-    backgroundColor: "#2563eb",
+    backgroundColor: "#d56c2f",
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
@@ -217,5 +234,5 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   emailButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   link: { marginTop: 16, alignItems: "center" },
-  linkText: { color: "#2563eb", fontSize: 14 }
+  linkText: { color: "#d56c2f", fontSize: 14 }
 });

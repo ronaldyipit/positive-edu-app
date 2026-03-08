@@ -8,8 +8,42 @@ import {
   StyleSheet,
   Animated,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Modal,
+  Linking
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { AppBackground } from "../components/AppBackground";
+
+const STRENGTH_CITATION_URL = "https://www.cityu.edu.hk/ss_posed/content.aspx?lang=zh&title=12";
+
+/** 24 項性格優勢定義（參考 Peterson & Seligman, 2004；香港城市大學正向教育研究室） */
+const STRENGTH_DEFINITIONS: Record<string, string> = {
+  creativity: "能够想出新方法去做事。如果有更好的方法，決不會滿足於用傳統方法去做同樣的事。",
+  curiosity: "對任何事都感到好奇。經常發問，對所有話題和題目感到著迷，並喜歡探索和發掘新事物。",
+  judgment: "能從多角度思考和考證事物是你重要的特質。不會妄下結論，只會根據實際的證據做決定。",
+  "love-of-learning": "喜愛學習新事物。喜愛上學、閱讀、參觀博物館和任何有機會學習的地方。",
+  perspective: "不認為自己有智慧，但自己的朋友卻看得到。重視自己對事物的洞察力，並向人尋求意見。",
+  bravery: "無所畏懼，不會在威脅、挑戰、困難或痛苦面前畏縮。即使面對反抗，仍會為正義而發聲，並根據自己的信念而行動。",
+  perseverance: "努力去完成自己開展的工作。無論怎樣的工作都會盡力準時完成，工作時不會分心，並在完成工作的過程中獲得滿足感。",
+  honesty: "誠實的人不止說實話，還會以真誠和真摰的態度生活，不虛偽，是個「真心」的人。",
+  zest: "無論做什麼事都懷著興奮的心情和幹勁。做事不會半途而廢，對你而言生命是一場歷險。",
+  love: "重視與別人的親密關係，特別是那些互相分享與關懷的關係。那些給你最親密感覺的人，同樣感到與你最親密。",
+  kindness: "對別人仁慈和寬宏大量。別人請你做事從不推搪，享受為別人做好事，即使是認識不深的人。",
+  "social-intelligence": "明白別人的動機和感受。在不同的社交場合知道該做甚麼，才能使其他人感到自在。",
+  citizenship: "作為團隊的一份子表現突出。你是效忠和致力於團隊的隊員，經常完成自己的分內事，並為團隊的成功而努力。",
+  fairness: "對所有人公平是堅持不變的原則。不會因為個人感情而對別人作出有偏差的判斷，並給予每個人平等的機會。",
+  leadership: "在領導方面表現出色。鼓勵組員完成工作，令每名組員有歸屬感，維持團隊的和諧。",
+  forgiveness: "寬恕那些對不起自己的人，常常給別人第二次機會。座右銘是慈悲，不是報復。",
+  humility: "不追求別人的注視，比較喜歡讓成就不言而喻。不認為自己很特別，而謙遜是公認和受重視的。",
+  prudence: "很小心，做選擇時總是一貫地審慎行事。不會說那些將來會後悔的話，或是做將來會後悔的事。",
+  "self-regulation": "自覺地規範自己的感覺與行為，是個自律的人。對食量和情緒有自制力，不會反被它們支配。",
+  appreciation: "在生命中的一切，從大自然、藝術、數學、科學以至日常生活體驗，都有留意和欣賞其美麗、優秀和富技巧之處。",
+  gratitude: "留意發生在自己身上的好事，但從不會視為理所當然。因為常常表達謝意，身邊的人知道你是個懂得感恩的人。",
+  hope: "對未來有最好的期望，並努力達成心願。相信未來掌握在自己手中。",
+  humor: "喜歡大笑和逗別人快樂，為別人帶來歡笑很重要。在任何情況下都嘗試去看事情輕鬆的一面。",
+  spirituality: "對崇高的人生目標和宇宙意義有着強烈和貫徹的信念。知道自己怎樣在大環境中作出配合，信念塑造行為，也成了慰藉之源。"
+};
 
 type Message = {
   id: string;
@@ -131,6 +165,7 @@ const typingStyles = StyleSheet.create({
 export default function AICoachScreen() {
   // "strengths-select" → 先選優勢；"chat" → 進入對話
   const [screen, setScreen] = useState<"strengths-select" | "chat">("strengths-select");
+  const [definitionStrengthId, setDefinitionStrengthId] = useState<string | null>(null);
   const [selectedStrengths, setSelectedStrengths] = useState<string[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -212,12 +247,30 @@ export default function AICoachScreen() {
   // ── 優勢選擇畫面（自己想 3 個凸顯優勢，不填問卷）────────────────────────
   if (screen === "strengths-select") {
     return (
+      <AppBackground>
+      <View style={styles.outerWrap}>
+        <View style={styles.whiteCard}>
       <ScrollView style={styles.container} contentContainerStyle={styles.selectContainer}>
         <Text style={styles.title}>AI 正向心態教練</Text>
+
+        <View style={styles.resonanceBlock}>
+          <Text style={styles.resonanceText}>
+            成日被人話「你唔夠好」、淨係睇成績？其實你身上有好多強項，只係未有人同你一齊發掘。讀書、測驗、人際……壓力好大時，認識自己嘅性格強項，可以幫你更有力、更接納自己。
+          </Text>
+        </View>
+
+        <Text style={styles.introHeading}>甚麼是性格強項？</Text>
+        <Text style={styles.introBody}>
+          性格強項由心理學家 Peterson 與 Seligman 提出，他們識別出六種美德及二十四種性格強項（Peterson & Seligman, 2004）。當我們發現、承認並在日常生活中運用這些強項時，會更愉快、更有成就、更具彈性，對生活更滿意（Seligman, 2011；香港城市大學正向教育研究室，n.d.）。
+        </Text>
+
         <Text style={styles.selectHeading}>想想你最突出的 3 個性格優勢</Text>
         <Text style={styles.selectDesc}>
           不用填問卷，從下面 24 項性格優勢中，選出你認為最能代表自己的 3 個。{"\n"}
           教練會根據你的選擇來引導對話，幫你用自身強項面對挑戰。
+        </Text>
+        <Text style={styles.selectDefHint}>
+          點擊每項右側的 ⓘ 圖示可查看定義。
         </Text>
 
         {VIRTUE_STRENGTHS.map(({ virtue, strengths }) => (
@@ -226,23 +279,80 @@ export default function AICoachScreen() {
             <View style={styles.strengthsGrid}>
               {strengths.map((s) => {
                 const selected = selectedStrengths.includes(s.id);
+                const definition = STRENGTH_DEFINITIONS[s.id];
                 return (
-                  <TouchableOpacity
-                    key={s.id}
-                    style={[styles.strengthBtn, selected && styles.strengthBtnSelected]}
-                    onPress={() => toggleStrength(s.id)}
-                  >
-                    <Text style={styles.strengthEmoji}>{s.emoji}</Text>
-                    <Text style={[styles.strengthLabel, selected && styles.strengthLabelSelected]}>
-                      {s.label}
-                    </Text>
-                    {selected && <Text style={styles.strengthCheck}>✓</Text>}
-                  </TouchableOpacity>
+                  <View key={s.id} style={styles.strengthBtnWrap}>
+                    <TouchableOpacity
+                      style={[styles.strengthBtn, selected && styles.strengthBtnSelected]}
+                      onPress={() => toggleStrength(s.id)}
+                    >
+                      <Text style={styles.strengthEmoji}>{s.emoji}</Text>
+                      <Text style={[styles.strengthLabel, selected && styles.strengthLabelSelected]}>
+                        {s.label}
+                      </Text>
+                      {selected && <Text style={styles.strengthCheck}>✓</Text>}
+                    </TouchableOpacity>
+                    {definition ? (
+                      <TouchableOpacity
+                        style={styles.strengthInfoBtn}
+                        onPress={() => setDefinitionStrengthId(s.id)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="information-circle-outline" size={18} color="#78716c" />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
                 );
               })}
             </View>
           </View>
         ))}
+
+        <Modal
+          visible={!!definitionStrengthId}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDefinitionStrengthId(null)}
+        >
+          <TouchableOpacity
+            style={styles.defModalOverlay}
+            activeOpacity={1}
+            onPress={() => setDefinitionStrengthId(null)}
+          >
+            <TouchableOpacity
+              style={styles.defModalContent}
+              activeOpacity={1}
+              onPress={() => {}}
+            >
+              {definitionStrengthId ? (
+                <>
+                  <View style={styles.defModalHeader}>
+                    <Text style={styles.defModalTitle}>
+                      {getStrengthById(definitionStrengthId)?.emoji}{" "}
+                      {getStrengthById(definitionStrengthId)?.label}
+                    </Text>
+                    <TouchableOpacity onPress={() => setDefinitionStrengthId(null)} hitSlop={12}>
+                      <Ionicons name="close" size={24} color="#64748b" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.defModalBody}>
+                    {STRENGTH_DEFINITIONS[definitionStrengthId]}
+                  </Text>
+                  <Text style={styles.defModalCitation}>
+                    參考：香港城市大學正向教育研究室「美德與品格強項」(Peterson & Seligman, 2004)
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.defModalLink}
+                    onPress={() => Linking.openURL(STRENGTH_CITATION_URL)}
+                  >
+                    <Text style={styles.defModalLinkText}>查看來源</Text>
+                    <Ionicons name="open-outline" size={14} color="#d56c2f" />
+                  </TouchableOpacity>
+                </>
+              ) : null}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         <Text style={styles.selectHint}>
           {selectedStrengths.length === 0
@@ -259,12 +369,28 @@ export default function AICoachScreen() {
             {selectedStrengths.length === 3 ? "以我的 3 個優勢開始對話 →" : "請先選滿 3 個優勢"}
           </Text>
         </TouchableOpacity>
+
+        <Text style={styles.citationFooter}>
+          性格優勢分類參考：{" "}
+          <Text
+            style={styles.citationLink}
+            onPress={() => Linking.openURL(STRENGTH_CITATION_URL)}
+          >
+            香港城市大學正向教育研究室 — 美德與品格強項
+          </Text>
+        </Text>
       </ScrollView>
+        </View>
+      </View>
+      </AppBackground>
     );
   }
 
   // ── 對話畫面 ────────────────────────────────────────────────
   return (
+    <AppBackground>
+    <View style={styles.outerWrap}>
+      <View style={styles.whiteCard}>
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -358,17 +484,54 @@ export default function AICoachScreen() {
       </View>
       <Text style={styles.disclaimer}>本教練僅供教育用途，不能取代專業心理健康服務。</Text>
     </KeyboardAvoidingView>
+      </View>
+    </View>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9fafb" },
+  outerWrap: { flex: 1, padding: 16 },
+  whiteCard: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#d56c2f",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    elevation: 3
+  },
+  container: { flex: 1 },
   // Strengths select
   selectContainer: { padding: 16, paddingBottom: 40 },
   title: { fontSize: 20, fontWeight: "700", color: "#111827", marginBottom: 14, paddingHorizontal: 4 },
+  resonanceBlock: {
+    backgroundColor: "#fff7ed",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: "#d56c2f"
+  },
+  resonanceText: {
+    fontSize: 14,
+    color: "#78350f",
+    lineHeight: 22
+  },
+  introHeading: { fontSize: 15, fontWeight: "700", color: "#374151", marginBottom: 6 },
+  introBody: {
+    fontSize: 13,
+    color: "#4b5563",
+    lineHeight: 20,
+    marginBottom: 14
+  },
   selectHeading: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 6 },
-  selectDesc: { fontSize: 13, color: "#4b5563", marginBottom: 18, lineHeight: 20 },
+  selectDesc: { fontSize: 13, color: "#4b5563", marginBottom: 8, lineHeight: 20 },
+  selectDefHint: { fontSize: 12, color: "#78716c", marginBottom: 14, fontStyle: "italic" },
   strengthsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 14 },
+  strengthBtnWrap: { flexDirection: "row", alignItems: "center", gap: 4 },
   strengthBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -380,21 +543,43 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
     backgroundColor: "#fff"
   },
-  strengthBtnSelected: { borderColor: "#2563eb", backgroundColor: "#eff6ff" },
+  strengthBtnSelected: { borderColor: "#d56c2f", backgroundColor: "#fff7ed" },
   strengthEmoji: { fontSize: 18 },
   strengthLabel: { fontSize: 14, color: "#374151", fontWeight: "500" },
-  strengthLabelSelected: { color: "#1d4ed8", fontWeight: "700" },
-  strengthCheck: { fontSize: 14, color: "#2563eb", fontWeight: "700" },
-  selectHint: { fontSize: 13, color: "#6b7280", marginBottom: 20, textAlign: "center" },
+  strengthLabelSelected: { color: "#b45309", fontWeight: "700" },
+  strengthCheck: { fontSize: 14, color: "#d56c2f", fontWeight: "700" },
+  strengthInfoBtn: { padding: 4, justifyContent: "center" },
+  selectHint: { fontSize: 13, color: "#6b7280", marginBottom: 16, textAlign: "center" },
+  defModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    padding: 24
+  },
+  defModalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    maxWidth: 400,
+    alignSelf: "center"
+  },
+  defModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  defModalTitle: { fontSize: 18, fontWeight: "700", color: "#1c1917", flex: 1 },
+  defModalBody: { fontSize: 14, color: "#374151", lineHeight: 22, marginBottom: 12 },
+  defModalCitation: { fontSize: 11, color: "#78716c", fontStyle: "italic", marginBottom: 8 },
+  defModalLink: { flexDirection: "row", alignItems: "center", gap: 4 },
+  defModalLinkText: { fontSize: 13, color: "#d56c2f", fontWeight: "600" },
+  citationFooter: { fontSize: 11, color: "#9ca3af", marginTop: 16, marginBottom: 8 },
+  citationLink: { color: "#d56c2f", textDecorationLine: "underline" },
   virtueSection: { marginBottom: 18 },
   virtueTitle: { fontSize: 14, fontWeight: "700", color: "#374151", marginBottom: 8 },
   startBtn: {
-    backgroundColor: "#2563eb",
+    backgroundColor: "#d56c2f",
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: "center"
   },
-  startBtnDisabled: { backgroundColor: "#93c5fd", opacity: 0.9 },
+  startBtnDisabled: { backgroundColor: "#fdba74", opacity: 0.9 },
   startBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   // Chat screen top bar
   strengthsBar: {
@@ -404,19 +589,19 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#eff6ff",
+    backgroundColor: "#fff7ed",
     borderBottomWidth: 1,
-    borderBottomColor: "#bfdbfe"
+    borderBottomColor: "#fed7aa"
   },
   strengthTag: {
-    backgroundColor: "#dbeafe",
+    backgroundColor: "#ffedd5",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999
   },
-  strengthTagText: { fontSize: 12, color: "#1d4ed8", fontWeight: "600" },
+  strengthTagText: { fontSize: 12, color: "#b45309", fontWeight: "600" },
   editStrengthsBtn: { marginLeft: "auto" },
-  editStrengthsBtnText: { fontSize: 12, color: "#2563eb", fontWeight: "600" },
+  editStrengthsBtnText: { fontSize: 12, color: "#d56c2f", fontWeight: "600" },
   // Mood buttons
   moodRow: {
     flexDirection: "row",
@@ -452,7 +637,7 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: 16 },
   bubble: { padding: 10, borderRadius: 18, maxWidth: "72%" },
-  userBubble: { backgroundColor: "#2563eb", borderBottomRightRadius: 4 },
+  userBubble: { backgroundColor: "#d56c2f", borderBottomRightRadius: 4 },
   coachBubble: {
     backgroundColor: "#fff",
     borderBottomLeftRadius: 4,
@@ -469,7 +654,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8, backgroundColor: "#fff",
     fontSize: 14, color: "#111827"
   },
-  sendButton: { backgroundColor: "#2563eb", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 21 },
+  sendButton: { backgroundColor: "#d56c2f", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 21 },
   sendButtonDisabled: { opacity: 0.4 },
   sendText: { color: "#fff", fontWeight: "700" },
   disclaimer: { fontSize: 11, color: "#9ca3af", textAlign: "center", paddingBottom: 8 }

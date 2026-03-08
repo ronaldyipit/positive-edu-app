@@ -3,7 +3,7 @@ require("dotenv").config();
 
 module.exports = {
   expo: {
-    name: "Positive Education Companion",
+    name: "正發光",
     slug: "positive-edu-app",
     version: "1.0.0",
     orientation: "portrait",

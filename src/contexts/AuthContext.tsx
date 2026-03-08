@@ -7,13 +7,16 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithCredential,
-  signInWithPopup
+  signInWithPopup,
+  updateProfile
 } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 import { Platform } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import Constants from "expo-constants";
 import { auth } from "../config/firebase";
+import { db } from "../config/firebase";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -22,7 +25,7 @@ type AuthContextType = {
   loading: boolean;
   googleLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, displayName?: string, grade?: string) => Promise<void>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   authError: string | null;
@@ -92,11 +95,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    displayName?: string,
+    grade?: string
+  ) => {
     if (!auth) throw new Error("Firebase Auth 未設定");
     setAuthError(null);
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const { user } = await createUserWithEmailAndPassword(auth, email, password);
+      if (displayName?.trim()) {
+        await updateProfile(user, { displayName: displayName.trim() });
+      }
+      if (db && (displayName?.trim() || grade)) {
+        await setDoc(doc(db, "users", user.uid), {
+          displayName: displayName?.trim() || null,
+          grade: grade || null,
+          updatedAt: new Date().toISOString()
+        });
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "註冊失敗";
       setAuthError(firebaseErrorToZh(msg));

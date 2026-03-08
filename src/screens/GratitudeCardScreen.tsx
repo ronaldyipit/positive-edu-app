@@ -11,6 +11,7 @@ import {
   Image
 } from "react-native";
 import ViewShot from "react-native-view-shot";
+import { AppBackground } from "../components/AppBackground";
 import * as MediaLibrary from "expo-media-library";
 import * as Sharing from "expo-sharing";
 
@@ -163,6 +164,9 @@ export default function GratitudeCardScreen() {
   };
 
   return (
+    <AppBackground>
+    <View style={styles.outerWrap}>
+      <View style={styles.whiteCard}>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <Text style={styles.title}>感恩卡製作</Text>
       <Text style={styles.subtitle}>不好意思當面說「謝謝」？製作一張感恩卡直接傳給對方吧。</Text>
@@ -243,7 +247,7 @@ export default function GratitudeCardScreen() {
               <Text style={[styles.cardBody, { color: theme.body }]}>{generatedText}</Text>
               <View style={[styles.cardDivider, { backgroundColor: theme.border }]} />
               <Text style={[styles.cardFooter, { color: theme.title }]}>
-                Positive Education Companion
+                正發光
               </Text>
             </View>
           </ViewShot>
@@ -282,27 +286,42 @@ export default function GratitudeCardScreen() {
         </>
       )}
     </ScrollView>
+      </View>
+    </View>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: "#f9fafb" },
+  outerWrap: { flex: 1, padding: 16 },
+  whiteCard: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#d56c2f",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    elevation: 3
+  },
+  scroll: { flex: 1 },
   container: { padding: 16, paddingBottom: 40 },
   title: { fontSize: 22, fontWeight: "700", marginBottom: 4, color: "#111827" },
   subtitle: { fontSize: 13, color: "#4b5563", marginBottom: 14 },
   promptBox: {
-    backgroundColor: "#f0fdf4",
+    backgroundColor: "#fffbeb",
     borderRadius: 12,
     padding: 12,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#bbf7d0"
+    borderColor: "#fde68a"
   },
-  promptLabel: { fontSize: 11, color: "#16a34a", fontWeight: "600", marginBottom: 4 },
-  promptText: { fontSize: 14, color: "#166534" },
+  promptLabel: { fontSize: 11, color: "#b45309", fontWeight: "600", marginBottom: 4 },
+  promptText: { fontSize: 14, color: "#92400e" },
   input: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: "#fde68a",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -326,13 +345,13 @@ const styles = StyleSheet.create({
   themeName: { fontSize: 13, fontWeight: "600" },
   actionRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" },
   generateBtn: {
-    backgroundColor: "#6366f1",
+    backgroundColor: "#d56c2f",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 999
   },
   generateBtnAi: {
-    backgroundColor: "#7c3aed",
+    backgroundColor: "#d56c2f",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 999
@@ -341,12 +360,12 @@ const styles = StyleSheet.create({
   generateBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
   switchBtn: {
     borderWidth: 1.5,
-    borderColor: "#6366f1",
+    borderColor: "#d56c2f",
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999
   },
-  switchBtnText: { color: "#6366f1", fontWeight: "600", fontSize: 14 },
+  switchBtnText: { color: "#d56c2f", fontWeight: "600", fontSize: 14 },
   // Card (ViewShot area)
   card: {
     borderRadius: 20,

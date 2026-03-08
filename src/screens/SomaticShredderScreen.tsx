@@ -12,6 +12,7 @@ import {
   Vibration
 } from "react-native";
 import { Accelerometer } from "expo-sensors";
+import { AppBackground } from "../components/AppBackground";
 
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "http://localhost:4000";
 
@@ -188,6 +189,9 @@ export default function SomaticShredderScreen() {
   const currentPhase = BREATH_PHASES[breathPhaseIdx];
 
   return (
+    <AppBackground>
+    <View style={styles.outerWrap}>
+      <View style={styles.whiteCard}>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <Text style={styles.title}>抒壓碎紙機</Text>
 
@@ -318,11 +322,26 @@ export default function SomaticShredderScreen() {
         </TouchableOpacity>
       )}
     </ScrollView>
+      </View>
+    </View>
+    </AppBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: "#f9fafb" },
+  outerWrap: { flex: 1, padding: 16 },
+  whiteCard: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#d56c2f",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    elevation: 3
+  },
+  scroll: { flex: 1 },
   container: { padding: 16, paddingBottom: 40 },
   title: { fontSize: 22, fontWeight: "700", marginBottom: 4, color: "#111827" },
   subtitle: { fontSize: 13, color: "#4b5563", marginBottom: 12, lineHeight: 20 },
@@ -339,7 +358,7 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   primaryBtn: {
-    backgroundColor: "#ef4444",
+    backgroundColor: "#d56c2f",
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 999,
@@ -374,7 +393,7 @@ const styles = StyleSheet.create({
   },
   shakeBarFill: {
     height: "100%",
-    backgroundColor: "#ef4444",
+    backgroundColor: "#d56c2f",
     borderRadius: 999
   },
   shakeHint: { fontSize: 14, color: "#6b7280", fontWeight: "600" },
@@ -425,7 +444,7 @@ const styles = StyleSheet.create({
   breathStatusText: { fontSize: 13, color: "#4b5563", textAlign: "center", lineHeight: 20 },
   resetBtn: {
     alignSelf: "center",
-    backgroundColor: "#6b7280",
+    backgroundColor: "#d56c2f",
     paddingHorizontal: 28,
     paddingVertical: 12,
     borderRadius: 999
