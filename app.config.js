@@ -12,8 +12,9 @@ module.exports = {
     assetBundlePatterns: ["**/*"],
     ios: { supportsTablet: true },
     android: {
-      package: "com.positiveedu.companion"
-      // 使用預設 Hermes，避免從 JitPack 下載 jsc-android 導致逾時
+      package: "com.positiveedu.companion",
+      // 強制使用 Hermes，避免向 JitPack 拉 jsc-android（Read timed out）
+      jsEngine: "hermes"
     },
     plugins: [],
     web: { bundler: "metro", output: "single" },

@@ -25,6 +25,8 @@ type AuthContextType = {
   user: User | null;
   loading: boolean;
   googleLoading: boolean;
+  /** 是否已正確載入 Firebase 設定（Expo Go 須從專案目錄執行 npx expo start 並有 .env） */
+  isFirebaseConfigured: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName?: string, grade?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -198,6 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     loading,
     googleLoading,
+    isFirebaseConfigured: !!auth,
     signIn,
     signUp,
     signOut,

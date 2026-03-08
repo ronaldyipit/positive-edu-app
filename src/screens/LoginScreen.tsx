@@ -18,7 +18,7 @@ export default function LoginScreen({
 }: {
   navigation: { navigate: (name: string) => void };
 }) {
-  const { signIn, signInWithGoogle, googleLoading, authError, clearAuthError } = useAuth();
+  const { signIn, signInWithGoogle, googleLoading, authError, clearAuthError, isFirebaseConfigured } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -57,6 +57,15 @@ export default function LoginScreen({
         <Text style={styles.title}>正發光</Text>
         <Text style={styles.subtitle}>建立你的正向成長習慣</Text>
 
+        {!isFirebaseConfigured ? (
+          <View style={styles.configWarning}>
+            <Text style={styles.configWarningTitle}>無法登入</Text>
+            <Text style={styles.configWarningText}>
+              請從電腦專案目錄執行「npx expo start」，並確認專案根目錄有 .env 且已填寫 EXPO_PUBLIC_FIREBASE_* 與 Google 用戶端 ID。Expo Go 必須連到該開發伺服器才能載入 Firebase 設定。
+            </Text>
+          </View>
+        ) : (
+          <>
         {/* Google 登入（主要按鈕） */}
         <TouchableOpacity
           style={[styles.googleButton, isAnyLoading && styles.buttonDisabled]}
@@ -134,6 +143,8 @@ export default function LoginScreen({
         >
           <Text style={styles.linkText}>還沒有帳號？按此註冊</Text>
         </TouchableOpacity>
+          </>
+        )}
       </View>
       </AppBackground>
     </KeyboardAvoidingView>
@@ -234,5 +245,15 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   emailButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   link: { marginTop: 16, alignItems: "center" },
-  linkText: { color: "#d56c2f", fontSize: 14 }
+  linkText: { color: "#d56c2f", fontSize: 14 },
+  configWarning: {
+    backgroundColor: "#fef3c7",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#f59e0b"
+  },
+  configWarningTitle: { fontSize: 16, fontWeight: "600", color: "#92400e", marginBottom: 8 },
+  configWarningText: { fontSize: 13, color: "#78350f", lineHeight: 20 }
 });

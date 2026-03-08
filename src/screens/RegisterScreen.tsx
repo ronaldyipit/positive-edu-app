@@ -19,7 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 const GRADES = ["中一", "中二", "中三", "中四", "中五", "中六"];
 
 export default function RegisterScreen({ navigation }: { navigation: { goBack: () => void } }) {
-  const { signUp, authError, clearAuthError } = useAuth();
+  const { signUp, authError, clearAuthError, isFirebaseConfigured } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [grade, setGrade] = useState<string | null>(null);
   const [gradeModalVisible, setGradeModalVisible] = useState(false);
@@ -86,6 +86,15 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
         />
         <Text style={styles.title}>建立帳號</Text>
         <Text style={styles.subtitle}>填寫簡單資料，註冊後即可使用所有功能</Text>
+
+        {!isFirebaseConfigured ? (
+          <View style={styles.configWarning}>
+            <Text style={styles.configWarningTitle}>無法註冊</Text>
+            <Text style={styles.configWarningText}>
+              請從電腦專案目錄執行「npx expo start」，並確認專案根目錄有 .env 且已填寫 EXPO_PUBLIC_FIREBASE_*。Expo Go 必須連到該開發伺服器才能載入 Firebase 設定。
+            </Text>
+          </View>
+        ) : null}
 
         <TextInput
           style={styles.input}
@@ -190,9 +199,9 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
         {displayError ? <Text style={styles.error}>{displayError}</Text> : null}
 
         <TouchableOpacity
-          style={[styles.button, loading && styles.buttonDisabled]}
+          style={[styles.button, (loading || !isFirebaseConfigured) && styles.buttonDisabled]}
           onPress={handleRegister}
-          disabled={loading}
+          disabled={loading || !isFirebaseConfigured}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -300,5 +309,15 @@ const styles = StyleSheet.create({
   },
   gradeOptionActive: { backgroundColor: "#fff7ed" },
   gradeOptionText: { fontSize: 16, color: "#374151" },
-  gradeOptionTextActive: { fontWeight: "600", color: "#d56c2f" }
+  gradeOptionTextActive: { fontWeight: "600", color: "#d56c2f" },
+  configWarning: {
+    backgroundColor: "#fef3c7",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#f59e0b"
+  },
+  configWarningTitle: { fontSize: 16, fontWeight: "600", color: "#92400e", marginBottom: 8 },
+  configWarningText: { fontSize: 13, color: "#78350f", lineHeight: 20 }
 });
