@@ -194,8 +194,60 @@ app.post("/api/gratitude-image", async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 4000;
-app.listen(port, () => {
-  console.log(`Positive Edu backend listening on http://localhost:${port}`);
+// 流程計時反思（App 有 call，若未實作可回傳簡單訊息）
+app.post("/api/timer-reflection", async (req, res) => {
+  try {
+    if (!poeApiKey) {
+      return res.status(503).json({ error: "POE_API_KEY is not configured." });
+    }
+    const body = req.body || {};
+    const systemPrompt =
+      "你是「正發光」App 的反思助手。用戶完成流程計時後會分享感受。請用繁體中文回一句簡短、溫暖的反思（約 20–40 字）。只輸出那一句。";
+    const userContent = typeof body.reflection === "string" ? body.reflection : JSON.stringify(body);
+    const response = await client.chat.completions.create({
+      model: "GPT-5.2",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent }
+      ],
+      temperature: 0.6
+    });
+    const message = response.choices[0]?.message?.content?.trim() || "做得很好，繼續保持。";
+    res.json({ message });
+  } catch (error) {
+    console.error("Error in /api/timer-reflection:", error);
+    res.status(500).json({ message: "反思生成失敗，下次再試。" });
+  }
 });
+
+// 身體釋放完成（App 有 call，回傳一句收尾語）
+app.post("/api/somatic-done", async (req, res) => {
+  try {
+    if (!poeApiKey) {
+      return res.json({ message: "今日嘅釋放完成，好好休息。" });
+    }
+    const response = await client.chat.completions.create({
+      model: "GPT-5.2",
+      messages: [
+        { role: "system", content: "你是「正發光」App 的身體釋放收尾助手。用廣東話寫一句簡短、溫暖的收尾語（約 15–30 字）。只輸出那一句。" },
+        { role: "user", content: "用戶剛完成身體釋放練習，請給一句收尾語。" }
+      ],
+      temperature: 0.7
+    });
+    const message = response.choices[0]?.message?.content?.trim() || "今日嘅釋放完成，好好休息。";
+    res.json({ message });
+  } catch (error) {
+    console.error("Error in /api/somatic-done:", error);
+    res.json({ message: "今日嘅釋放完成，好好休息。" });
+  }
+});
+
+const port = process.env.PORT || 4000;
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`Positive Edu backend listening on http://localhost:${port}`);
+  });
+}
+
+module.exports = app;
 
