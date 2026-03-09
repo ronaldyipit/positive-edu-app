@@ -5,7 +5,8 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail
 } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth } from "../config/firebase";
@@ -18,12 +19,14 @@ type AuthContextType = {
   /** true = Firebase 已登入但尚未通過 OTP 驗證 */
   pendingOtp: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName?: string, grade?: string) => Promise<void>;
+  signUp: (email: string, password: string, displayName?: string, grade?: string, school?: string) => Promise<void>;
   signOut: () => Promise<void>;
   /** OTP 驗證通過後呼叫，解除攔截讓 user 進入主畫面 */
   confirmOtp: () => void;
   /** 取消 OTP 流程，登出 Firebase */
   cancelOtp: () => Promise<void>;
+  /** 發送重設密碼電郵 */
+  resetPassword: (email: string) => Promise<void>;
   authError: string | null;
   clearAuthError: () => void;
 };
@@ -60,10 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginOtpFlagRef.current = true;
       await signInWithEmailAndPassword(auth, email, password);
       setPendingOtp(true);
-    } catch (e: unknown) {
+    } catch (e: any) {
       loginOtpFlagRef.current = false;
-      const msg = e instanceof Error ? e.message : "登入失敗";
-      setAuthError(firebaseErrorToZh(msg));
+      const code = e?.code || "";
+      const msg = e?.message || "登入失敗";
+      setAuthError(firebaseErrorToZh(code || msg));
       throw e;
     }
   };
@@ -72,7 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string,
     password: string,
     displayName?: string,
-    grade?: string
+    grade?: string,
+    school?: string
   ) => {
     if (!auth) throw new Error("Firebase Auth 未設定");
     setAuthError(null);
@@ -81,16 +86,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (displayName?.trim()) {
         await updateProfile(user, { displayName: displayName.trim() });
       }
-      if (db && (displayName?.trim() || grade)) {
+      if (db && (displayName?.trim() || grade || school)) {
         await setDoc(doc(db, "users", user.uid), {
           displayName: displayName?.trim() || null,
           grade: grade || null,
+          school: school?.trim() || null,
           updatedAt: new Date().toISOString()
         });
       }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "註冊失敗";
-      setAuthError(firebaseErrorToZh(msg));
+    } catch (e: any) {
+      const code = e?.code || "";
+      const msg = e?.message || "註冊失敗";
+      setAuthError(firebaseErrorToZh(code || msg));
       throw e;
     }
   };
@@ -109,6 +116,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (auth) await firebaseSignOut(auth);
   };
 
+  const resetPassword = async (email: string) => {
+    if (!auth) throw new Error("Firebase Auth 未設定");
+    setAuthError(null);
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (e: any) {
+      const code = e?.code || "";
+      const msg = e?.message || "發送重設密碼郵件失敗";
+      setAuthError(firebaseErrorToZh(code || msg));
+      throw e;
+    }
+  };
+
   const clearAuthError = () => setAuthError(null);
 
   const value: AuthContextType = {
@@ -121,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     confirmOtp,
     cancelOtp,
+    resetPassword,
     authError,
     clearAuthError
   };
@@ -134,15 +155,17 @@ export function useAuth() {
   return ctx;
 }
 
-function firebaseErrorToZh(message: string): string {
-  if (message.includes("auth/invalid-email")) return "請輸入有效的電子郵件地址。";
-  if (message.includes("auth/user-disabled")) return "此帳號已被停用。";
-  if (message.includes("auth/user-not-found") || message.includes("auth/wrong-password"))
-    return "電子郵件或密碼錯誤。";
-  if (message.includes("auth/email-already-in-use")) return "此電子郵件已被註冊。";
-  if (message.includes("auth/weak-password")) return "密碼至少需要 6 個字元。";
-  if (message.includes("auth/too-many-requests")) return "嘗試次數過多，請稍後再試。";
-  if (message.includes("auth/network-request-failed")) return "網路錯誤，請檢查連線。";
-  if (message.includes("auth/invalid-credential")) return "電子郵件或密碼錯誤。";
-  return message || "發生錯誤，請稍後再試。";
+function firebaseErrorToZh(codeOrMsg: string): string {
+  const s = codeOrMsg || "";
+  if (s.includes("invalid-email")) return "請輸入有效的電子郵件地址。";
+  if (s.includes("user-disabled")) return "此帳號已被停用。";
+  if (s.includes("user-not-found")) return "此電子郵件尚未註冊，請先建立帳號。";
+  if (s.includes("wrong-password")) return "密碼不正確，請重新輸入。";
+  if (s.includes("invalid-credential")) return "電子郵件不存在或密碼不正確。";
+  if (s.includes("email-already-in-use")) return "此電子郵件已被註冊。";
+  if (s.includes("weak-password")) return "密碼至少需要 6 個字元。";
+  if (s.includes("too-many-requests")) return "嘗試次數過多，請稍後再試。";
+  if (s.includes("network-request-failed")) return "網路錯誤，請檢查連線。";
+  if (s.includes("missing-password")) return "請輸入密碼。";
+  return "發生錯誤，請稍後再試。";
 }

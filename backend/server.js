@@ -3,7 +3,19 @@ const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const admin = require("firebase-admin");
 const OpenAI = require("openai");
+
+// ── Firebase Admin（用於伺服器端重設密碼） ──
+if (!admin.apps.length && process.env.FIREBASE_PROJECT_ID) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n")
+    })
+  });
+}
 
 const app = express();
 app.use(cors());
@@ -88,6 +100,43 @@ app.post("/api/verify-otp", (req, res) => {
   const expected = hmacOtp(normalised, otp.trim(), expiresAt);
   const valid = expected === token;
   res.json({ valid, ...(valid ? {} : { error: "驗證碼不正確。" }) });
+});
+
+// ── 重設密碼（OTP 驗證 + Firebase Admin 改密碼） ──
+app.post("/api/reset-password", async (req, res) => {
+  const { email, otp, token, expiresAt, newPassword } = req.body || {};
+  if (!email || !otp || !token || !expiresAt || !newPassword) {
+    return res.status(400).json({ error: "缺少必要參數。" });
+  }
+  if (Date.now() > expiresAt) {
+    return res.status(400).json({ error: "驗證碼已過期，請重新發送。" });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: "密碼至少需要 6 個字元。" });
+  }
+
+  const normalised = email.trim().toLowerCase();
+  const expected = hmacOtp(normalised, otp.trim(), expiresAt);
+  if (expected !== token) {
+    return res.status(400).json({ error: "驗證碼不正確。" });
+  }
+
+  if (!admin.apps.length) {
+    return res.status(503).json({ error: "Firebase Admin 未設定，無法重設密碼。" });
+  }
+
+  try {
+    const userRecord = await admin.auth().getUserByEmail(normalised);
+    await admin.auth().updateUser(userRecord.uid, { password: newPassword });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("reset-password error:", err);
+    const code = err?.code || "";
+    if (code.includes("user-not-found")) {
+      return res.status(400).json({ error: "此電子郵件尚未註冊。" });
+    }
+    res.status(500).json({ error: "重設密碼失敗，請稍後再試。" });
+  }
 });
 
 app.post("/api/coach", async (req, res) => {

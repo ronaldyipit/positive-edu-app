@@ -11,6 +11,7 @@ import {
   Image
 } from "react-native";
 import Constants from "expo-constants";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
 import { AppBackground } from "../components/AppBackground";
 
@@ -105,12 +106,26 @@ export default function LoginScreen({
     hasSentOtp.current = false;
     try {
       await signIn(email.trim(), password);
-    } catch {
-      // authError set by AuthContext
+    } catch (e: any) {
+      const code = e?.code || "";
+      const msg = e?.message || "";
+      const errorMsg = translateFirebaseError(code || msg);
+      setLocalError(errorMsg);
     } finally {
       setLoading(false);
     }
   };
+
+  function translateFirebaseError(s: string): string {
+    if (s.includes("user-not-found")) return "此電子郵件尚未註冊，請先建立帳號。";
+    if (s.includes("wrong-password")) return "密碼不正確，請重新輸入。";
+    if (s.includes("invalid-credential")) return "電子郵件不存在或密碼不正確。";
+    if (s.includes("invalid-email")) return "請輸入有效的電子郵件地址。";
+    if (s.includes("user-disabled")) return "此帳號已被停用。";
+    if (s.includes("too-many-requests")) return "嘗試次數過多，請稍後再試。";
+    if (s.includes("network-request-failed")) return "網路錯誤，請檢查連線。";
+    return "登入失敗，請檢查電子郵件及密碼。";
+  }
 
   const handleVerifyOtp = async () => {
     if (!otpCode.trim()) { setOtpError("請輸入驗證碼。"); return; }
@@ -175,7 +190,7 @@ export default function LoginScreen({
 
             <TextInput
               style={styles.otpInput}
-              placeholder="輸入 6 位驗證碼"
+              placeholder="一次性驗證碼 (OTP)"
               placeholderTextColor="#9ca3af"
               value={otpCode}
               onChangeText={(t) => {
@@ -279,7 +294,20 @@ export default function LoginScreen({
                 editable={!loading}
               />
 
-              {displayError ? <Text style={styles.error}>{displayError}</Text> : null}
+              {displayError ? (
+                <View style={styles.errorBanner}>
+                  <Ionicons name="alert-circle" size={16} color="#dc2626" />
+                  <Text style={styles.errorBannerText}>{displayError}</Text>
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                style={styles.forgotLink}
+                onPress={() => navigation.navigate("ForgotPassword")}
+                disabled={loading}
+              >
+                <Text style={styles.forgotText}>忘記密碼？</Text>
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.primaryButton, loading && styles.buttonDisabled]}
@@ -346,6 +374,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#fffbeb"
   },
   error: { color: "#dc2626", fontSize: 13, marginBottom: 8 },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#fef2f2",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#fca5a5"
+  },
+  errorBannerText: { color: "#dc2626", fontSize: 14, fontWeight: "500", flex: 1 },
   primaryButton: {
     backgroundColor: "#d56c2f",
     borderRadius: 12,
@@ -364,6 +405,8 @@ const styles = StyleSheet.create({
     marginTop: 12
   },
   resendText: { color: "#d56c2f", fontSize: 14, fontWeight: "600" },
+  forgotLink: { alignSelf: "flex-end", marginBottom: 12, paddingVertical: 2 },
+  forgotText: { color: "#d56c2f", fontSize: 13 },
   link: { marginTop: 16, alignItems: "center" },
   linkText: { color: "#d56c2f", fontSize: 14 },
   configWarning: {

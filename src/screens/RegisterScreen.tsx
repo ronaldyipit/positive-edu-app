@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   Image,
   Modal,
-  ScrollView
+  ScrollView,
+  Alert
 } from "react-native";
 import Constants from "expo-constants";
 import { useAuth } from "../contexts/AuthContext";
@@ -27,6 +28,7 @@ const GRADES = ["中一", "中二", "中三", "中四", "中五", "中六"];
 export default function RegisterScreen({ navigation }: { navigation: { goBack: () => void } }) {
   const { signUp, authError, clearAuthError, isFirebaseConfigured } = useAuth();
   const [displayName, setDisplayName] = useState("");
+  const [school, setSchool] = useState("");
   const [grade, setGrade] = useState<string | null>(null);
   const [gradeModalVisible, setGradeModalVisible] = useState(false);
   const [email, setEmail] = useState("");
@@ -101,9 +103,14 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
     }
   };
 
-  const handleVerifyOtp = async () => {
-    if (!otpCode.trim()) { setOtpError("請輸入驗證碼。"); return; }
+  const otpVerifyingRef = useRef(false);
+
+  const handleVerifyOtp = async (code?: string) => {
+    const codeToVerify = (code || otpCode).trim();
+    if (!codeToVerify) { setOtpError("請輸入驗證碼。"); return; }
     if (!otpToken) { setOtpError("請先發送驗證碼。"); return; }
+    if (otpVerifyingRef.current) return;
+    otpVerifyingRef.current = true;
     setOtpError(null);
     try {
       const res = await fetch(`${API_BASE}/api/verify-otp`, {
@@ -111,7 +118,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim().toLowerCase(),
-          otp: otpCode.trim(),
+          otp: codeToVerify,
           token: otpToken,
           expiresAt: otpExpiresAt
         })
@@ -126,21 +133,34 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
       }
     } catch (e: unknown) {
       setOtpError(e instanceof Error ? e.message : "驗證失敗");
+    } finally {
+      otpVerifyingRef.current = false;
     }
   };
 
-  // If email changes after OTP was verified, invalidate it
+  // 輸入滿 6 位數字後自動驗證
   useEffect(() => {
-    if (otpVerified && email.trim().toLowerCase() !== verifiedEmailRef.current) {
-      setOtpVerified(false);
+    if (otpCode.length === 6 && otpToken && !otpVerified && !otpVerifyingRef.current) {
+      handleVerifyOtp(otpCode);
     }
-  }, [email, otpVerified]);
+  }, [otpCode]);
+
+  const handleResetEmail = () => {
+    setOtpVerified(false);
+    setOtpToken(null);
+    setOtpCode("");
+    setOtpError(null);
+    setCountdown(0);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    verifiedEmailRef.current = "";
+  };
 
   const handleRegister = async () => {
     setLocalError(null);
     clearAuthError();
     setRegisterSuccess(false);
     if (!displayName.trim()) { setLocalError("請輸入用戶名稱。"); return; }
+    if (!school.trim()) { setLocalError("請輸入學校名稱。"); return; }
     if (!grade) { setLocalError("請選擇年級。"); return; }
     if (!email.trim()) { setLocalError("請輸入電子郵件。"); return; }
     if (!otpVerified) { setLocalError("請先完成電郵驗證。"); return; }
@@ -149,8 +169,8 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
     if (password !== confirmPassword) { setLocalError("兩次輸入的密碼不一致。"); return; }
     setLoading(true);
     try {
-      await signUp(email.trim(), password, displayName.trim(), grade);
-      setRegisterSuccess(true);
+      await signUp(email.trim(), password, displayName.trim(), grade, school.trim());
+      Alert.alert("註冊成功", `歡迎 ${displayName.trim()}！你已成功註冊，現在自動登入中。`);
     } catch {
       // authError set by AuthContext
     } finally {
@@ -193,6 +213,15 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
               value={displayName}
               onChangeText={(t) => { setDisplayName(t); setLocalError(null); clearAuthError(); }}
               autoCapitalize="words"
+            />
+
+            {/* 學校名稱 */}
+            <TextInput
+              style={styles.input}
+              placeholder="學校名稱（中文）"
+              placeholderTextColor="#9ca3af"
+              value={school}
+              onChangeText={(t) => { setSchool(t); setLocalError(null); clearAuthError(); }}
             />
 
             {/* 年級選擇 */}
@@ -274,7 +303,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
               <View style={styles.otpRow}>
                 <TextInput
                   style={[styles.input, styles.otpInput]}
-                  placeholder="6 位驗證碼"
+                  placeholder="一次性驗證碼 (OTP)"
                   placeholderTextColor="#9ca3af"
                   value={otpCode}
                   onChangeText={(t) => {
@@ -297,6 +326,9 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
               <View style={styles.verifiedBanner}>
                 <Ionicons name="checkmark-circle" size={16} color="#166534" />
                 <Text style={styles.verifiedText}>電郵已驗證</Text>
+                <TouchableOpacity onPress={handleResetEmail} style={styles.resetEmailButton}>
+                  <Text style={styles.resetEmailText}>更換電郵</Text>
+                </TouchableOpacity>
               </View>
             ) : null}
 
@@ -322,7 +354,12 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
               autoComplete="password"
             />
 
-            {displayError ? <Text style={styles.error}>{displayError}</Text> : null}
+            {displayError ? (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle" size={16} color="#dc2626" />
+                <Text style={styles.errorBannerText}>{displayError}</Text>
+              </View>
+            ) : null}
             {registerSuccess ? (
               <View style={styles.successBanner}>
                 <Text style={styles.successText}>註冊成功！正在自動登入…</Text>
@@ -419,8 +456,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#22c55e"
   },
-  verifiedText: { color: "#166534", fontSize: 13, fontWeight: "600" },
+  verifiedText: { color: "#166534", fontSize: 13, fontWeight: "600", flex: 1 },
+  resetEmailButton: { paddingHorizontal: 8, paddingVertical: 2 },
+  resetEmailText: { color: "#d56c2f", fontSize: 13, fontWeight: "600" },
   error: { color: "#dc2626", fontSize: 13, marginBottom: 8 },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#fef2f2",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#fca5a5"
+  },
+  errorBannerText: { color: "#dc2626", fontSize: 14, fontWeight: "500", flex: 1 },
   button: {
     backgroundColor: "#d56c2f",
     borderRadius: 12,
