@@ -111,8 +111,12 @@ app.post("/api/reset-password", async (req, res) => {
   if (Date.now() > expiresAt) {
     return res.status(400).json({ error: "驗證碼已過期，請重新發送。" });
   }
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: "密碼至少需要 6 個字元。" });
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: "密碼至少需要 8 個字元。" });
+  }
+  if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) ||
+      !/[0-9]/.test(newPassword) || !/[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/\\]/.test(newPassword)) {
+    return res.status(400).json({ error: "密碼須包含大寫字母、小寫字母、數字及特殊字符。" });
   }
 
   const normalised = email.trim().toLowerCase();

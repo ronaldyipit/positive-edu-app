@@ -163,7 +163,7 @@ function firebaseErrorToZh(codeOrMsg: string): string {
   if (s.includes("wrong-password")) return "密碼不正確，請重新輸入。";
   if (s.includes("invalid-credential")) return "電子郵件不存在或密碼不正確。";
   if (s.includes("email-already-in-use")) return "此電子郵件已被註冊。";
-  if (s.includes("weak-password")) return "密碼至少需要 6 個字元。";
+  if (s.includes("weak-password")) return "密碼強度不足，須至少 8 個字元，包含大小寫字母、數字及特殊字符。";
   if (s.includes("too-many-requests")) return "嘗試次數過多，請稍後再試。";
   if (s.includes("network-request-failed")) return "網路錯誤，請檢查連線。";
   if (s.includes("missing-password")) return "請輸入密碼。";

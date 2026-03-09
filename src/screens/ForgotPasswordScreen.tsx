@@ -22,6 +22,15 @@ const API_BASE =
 
 type Step = "email" | "otp" | "newPassword";
 
+function validatePassword(pw: string): string | null {
+  if (pw.length < 8) return "密碼至少需要 8 個字元。";
+  if (!/[A-Z]/.test(pw)) return "密碼須包含至少一個大寫英文字母 (A-Z)。";
+  if (!/[a-z]/.test(pw)) return "密碼須包含至少一個小寫英文字母 (a-z)。";
+  if (!/[0-9]/.test(pw)) return "密碼須包含至少一個數字 (0-9)。";
+  if (!/[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/\\]/.test(pw)) return "密碼須包含至少一個特殊字符（如 !@#$%^&*_+-）。";
+  return null;
+}
+
 export default function ForgotPasswordScreen({
   navigation
 }: {
@@ -122,7 +131,8 @@ export default function ForgotPasswordScreen({
   const handleResetPassword = async () => {
     setError(null);
     if (!newPassword) { setError("請輸入新密碼。"); return; }
-    if (newPassword.length < 6) { setError("密碼至少需要 6 個字元。"); return; }
+    const pwErr = validatePassword(newPassword);
+    if (pwErr) { setError(pwErr); return; }
     if (newPassword !== confirmPassword) { setError("兩次輸入的密碼不一致。"); return; }
     setLoading(true);
     try {
@@ -274,13 +284,16 @@ export default function ForgotPasswordScreen({
               </View>
               <TextInput
                 style={styles.input}
-                placeholder="新密碼（至少 6 字元）"
+                placeholder="新密碼"
                 placeholderTextColor="#9ca3af"
                 value={newPassword}
                 onChangeText={(t) => { setNewPassword(t); setError(null); }}
                 secureTextEntry
                 autoFocus
               />
+              <Text style={styles.passwordHint}>
+                須至少 8 個字元，包含大寫字母 (A-Z)、小寫字母 (a-z)、數字 (0-9) 及特殊字符 (!@#$%^&*_+-)
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="再次輸入新密碼"
@@ -364,6 +377,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "#fca5a5"
   },
   errorText: { color: "#dc2626", fontSize: 14, fontWeight: "500", flex: 1 },
+  passwordHint: { fontSize: 11, color: "#9ca3af", marginTop: -8, marginBottom: 12, paddingHorizontal: 4, lineHeight: 16 },
   verifiedBanner: {
     flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: "#dcfce7", borderRadius: 10,

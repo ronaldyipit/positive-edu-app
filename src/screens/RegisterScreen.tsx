@@ -25,6 +25,17 @@ const API_BASE =
 
 const GRADES = ["中一", "中二", "中三", "中四", "中五", "中六"];
 
+const PASSWORD_RULES = "密碼須至少 8 個字元，包含大寫字母 (A-Z)、小寫字母 (a-z)、數字 (0-9) 及特殊字符 (!@#$%^&*_+-)";
+
+function validatePassword(pw: string): string | null {
+  if (pw.length < 8) return "密碼至少需要 8 個字元。";
+  if (!/[A-Z]/.test(pw)) return "密碼須包含至少一個大寫英文字母 (A-Z)。";
+  if (!/[a-z]/.test(pw)) return "密碼須包含至少一個小寫英文字母 (a-z)。";
+  if (!/[0-9]/.test(pw)) return "密碼須包含至少一個數字 (0-9)。";
+  if (!/[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?/\\]/.test(pw)) return "密碼須包含至少一個特殊字符（如 !@#$%^&*_+-）。";
+  return null;
+}
+
 export default function RegisterScreen({ navigation }: { navigation: { goBack: () => void } }) {
   const { signUp, authError, clearAuthError, isFirebaseConfigured } = useAuth();
   const [displayName, setDisplayName] = useState("");
@@ -165,7 +176,8 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
     if (!email.trim()) { setLocalError("請輸入電子郵件。"); return; }
     if (!otpVerified) { setLocalError("請先完成電郵驗證。"); return; }
     if (!password) { setLocalError("請輸入密碼。"); return; }
-    if (password.length < 6) { setLocalError("密碼至少需要 6 個字元。"); return; }
+    const pwErr = validatePassword(password);
+    if (pwErr) { setLocalError(pwErr); return; }
     if (password !== confirmPassword) { setLocalError("兩次輸入的密碼不一致。"); return; }
     setLoading(true);
     try {
@@ -337,13 +349,16 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
             {/* 密碼 */}
             <TextInput
               style={styles.input}
-              placeholder="密碼（至少 6 字元）"
+              placeholder="密碼"
               placeholderTextColor="#9ca3af"
               value={password}
               onChangeText={(t) => { setPassword(t); setLocalError(null); clearAuthError(); }}
               secureTextEntry
               autoComplete="password"
             />
+            <Text style={styles.passwordHint}>
+              須至少 8 個字元，包含大寫字母 (A-Z)、小寫字母 (a-z)、數字 (0-9) 及特殊字符 (!@#$%^&*_+-)
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="再次輸入密碼"
@@ -459,6 +474,7 @@ const styles = StyleSheet.create({
   verifiedText: { color: "#166534", fontSize: 13, fontWeight: "600", flex: 1 },
   resetEmailButton: { paddingHorizontal: 8, paddingVertical: 2 },
   resetEmailText: { color: "#d56c2f", fontSize: 13, fontWeight: "600" },
+  passwordHint: { fontSize: 11, color: "#9ca3af", marginTop: -8, marginBottom: 12, paddingHorizontal: 4, lineHeight: 16 },
   error: { color: "#dc2626", fontSize: 13, marginBottom: 8 },
   errorBanner: {
     flexDirection: "row",
