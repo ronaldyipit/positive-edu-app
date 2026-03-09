@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 3
   },
-  appLogo: { width: 56, height: 56, alignSelf: "center", marginBottom: 16 },
+  appLogo: { width: 120, height: 120, alignSelf: "center", marginBottom: 16 },
   title: { fontSize: 22, fontWeight: "700", color: "#111827", marginBottom: 8 },
   email: { fontSize: 14, color: "#6b7280", marginBottom: 24 },
   logoutButton: {

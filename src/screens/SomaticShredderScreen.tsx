@@ -12,6 +12,7 @@ import {
   Vibration
 } from "react-native";
 import { Accelerometer } from "expo-sensors";
+import { Audio } from "expo-av";
 import { AppBackground } from "../components/AppBackground";
 
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "https://positive-edu-app.vercel.app";
@@ -35,7 +36,7 @@ const SHAKE_THRESHOLD = 1.8; // 搖動強度門檻
 
 export default function SomaticShredderScreen() {
   const [ventText, setVentText] = useState("");
-  const [step, setStep] = useState<"write" | "shake" | "breathe" | "done">("write");
+  const [step, setStep] = useState<"write" | "shake" | "shredded" | "breathe" | "done">("write");
   const [shakeProgress, setShakeProgress] = useState(0); // 0–100
   const [encouragement, setEncouragement] = useState("");
   const [breathPhaseIdx, setBreathPhaseIdx] = useState(0);
@@ -63,8 +64,30 @@ export default function SomaticShredderScreen() {
   const shakeAccumRef = useRef(0);
   const lastShakeRef = useRef(0);
   const maxMagnitudeRef = useRef(0);
+  const shredSoundRef = useRef<Audio.Sound | null>(null);
 
-  // ── 加速度計監聽（僅原生 App；Web 用下方「點擊粉碎」按鈕）──────────────────────────────────────────
+  // 載入碎紙音效
+  useEffect(() => {
+    let mounted = true;
+    Audio.Sound.createAsync(require("../../assets/sound/shredder.mp3"))
+      .then(({ sound }) => { if (mounted) shredSoundRef.current = sound; })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+      shredSoundRef.current?.unloadAsync();
+    };
+  }, []);
+
+  const playShredSound = async () => {
+    try {
+      const s = shredSoundRef.current;
+      if (!s) return;
+      await s.setPositionAsync(0);
+      await s.playAsync();
+    } catch {}
+  };
+
+  // ── 加速度計監聯（僅原生 App；Web 用下方「點擊粉碎」按鈕）──
   useEffect(() => {
     if (step !== "shake") return;
     if (Platform.OS === "web") return;
@@ -79,6 +102,7 @@ export default function SomaticShredderScreen() {
         if (magnitude > maxMagnitudeRef.current) maxMagnitudeRef.current = magnitude;
         shakeAccumRef.current = Math.min(shakeAccumRef.current + 12, 100);
         setShakeProgress(shakeAccumRef.current);
+        playShredSound();
         Animated.spring(shakeBarAnim, {
           toValue: shakeAccumRef.current,
           useNativeDriver: false,
@@ -110,7 +134,7 @@ export default function SomaticShredderScreen() {
       p.rot.setValue(0);
       p.opacity.setValue(1);
       Animated.parallel([
-        Animated.timing(p.x, { toValue: Math.cos(angle) * dist, duration: 600, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+        Animated.timing(p.x, { toValue: Math.cos(angle) * dist, duration: 600, useNativeDriver: true, easing: Easing.ease }),
         Animated.timing(p.y, { toValue: Math.sin(angle) * dist - 20, duration: 600, useNativeDriver: true }),
         Animated.timing(p.rot, { toValue: (Math.random() - 0.5) * 900, duration: 600, useNativeDriver: true }),
         Animated.sequence([
@@ -121,8 +145,7 @@ export default function SomaticShredderScreen() {
     });
 
     setTimeout(() => {
-      setStep("breathe");
-      startBreathing(0, 0);
+      setStep("shredded");
     }, 800);
   }, [shredPieces]);
 
@@ -153,7 +176,7 @@ export default function SomaticShredderScreen() {
       toValue: phase.targetSize,
       duration: durationSec * 1000,
       useNativeDriver: false,
-      easing: Easing.inOut(Easing.sine)
+      easing: Easing.ease
     });
     breathAnimRef.current.start(() => {});
 
@@ -307,7 +330,36 @@ export default function SomaticShredderScreen() {
         </View>
       )}
 
-      {/* ── Step 3: 呼吸 ── */}
+      {/* ── Step 3: 碎紙結果 + 確認開始呼吸 ── */}
+      {step === "shredded" && (
+        <>
+          <View style={styles.shredResult}>
+            <Text style={styles.shredResultTitle}>已粉碎 ✓</Text>
+            <Text style={styles.encouragementText}>{encouragement}</Text>
+            {intensityFeedback ? <Text style={styles.intensityText}>{intensityFeedback}</Text> : null}
+          </View>
+
+          <View style={styles.breathIntro}>
+            <Text style={styles.breathIntroTitle}>接下來：4-7-8 呼吸練習</Text>
+            <Text style={styles.breathIntroDesc}>
+              壓力已粉碎！現在讓我們用呼吸來安撫身體。{"\n\n"}
+              吸氣 4 秒 → 屏氣 7 秒 → 呼氣 8 秒{"\n"}
+              共做 3 次，啟動你的副交感神經，讓身心回到平靜。
+            </Text>
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={() => {
+                setStep("breathe");
+                startBreathing(0, 0);
+              }}
+            >
+              <Text style={styles.primaryBtnText}>準備好了，開始呼吸 →</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      {/* ── Step 4: 呼吸進行中 / 完成 ── */}
       {(step === "breathe" || step === "done") && (
         <>
           <View style={styles.shredResult}>
@@ -335,7 +387,6 @@ export default function SomaticShredderScreen() {
               )}
             </View>
 
-            {/* 進度點 */}
             <View style={styles.breathDotsRow}>
               {[0, 1, 2].map((i) => (
                 <View key={i} style={[styles.breathDot, breathCycles > i && styles.breathDotDone]} />
@@ -348,7 +399,6 @@ export default function SomaticShredderScreen() {
                 : `第 ${breathCycles + 1} / 3 次`}
             </Text>
 
-            {/* 暫停 / 繼續 */}
             {step === "breathe" && (
               <TouchableOpacity
                 style={[styles.primaryBtn, styles.pauseBtn]}
@@ -458,6 +508,18 @@ const styles = StyleSheet.create({
   encouragementText: { fontSize: 15, color: "#c2410c", textAlign: "center", lineHeight: 22 },
   intensityText: { fontSize: 14, color: "#ea580c", fontWeight: "600", marginTop: 4 },
   aiClosingText: { fontSize: 13, color: "#78350f", fontStyle: "italic", marginTop: 8 },
+  // Breath intro (confirmation step)
+  breathIntro: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 16,
+    padding: 22,
+    marginBottom: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#bfdbfe"
+  },
+  breathIntroTitle: { fontSize: 18, fontWeight: "700", color: "#1e3a5f", marginBottom: 10 },
+  breathIntroDesc: { fontSize: 14, color: "#374151", textAlign: "center", lineHeight: 22, marginBottom: 18 },
   // Breathing
   breathSection: {
     backgroundColor: "#fff",

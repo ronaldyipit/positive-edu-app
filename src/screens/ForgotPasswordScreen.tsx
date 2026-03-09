@@ -9,7 +9,8 @@ import {
   Platform,
   ActivityIndicator,
   Image,
-  Alert
+  Alert,
+  ScrollView
 } from "react-native";
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
@@ -188,10 +189,12 @@ export default function ForgotPasswordScreen({
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
       <AppBackground variant="auth">
-        <View style={styles.card}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.card}>
           <Image
             source={require("../../assets/img/AppLogo.png")}
             style={styles.appLogo}
@@ -240,7 +243,7 @@ export default function ForgotPasswordScreen({
               <Text style={styles.hint}>驗證碼已發送至 {email.trim()}</Text>
               <TextInput
                 style={styles.otpInput}
-                placeholder="一次性驗證碼 (OTP)"
+                placeholder="驗證碼 (OTP)"
                 placeholderTextColor="#9ca3af"
                 value={otpCode}
                 onChangeText={(t) => {
@@ -327,14 +330,16 @@ export default function ForgotPasswordScreen({
           >
             <Text style={styles.backLinkText}>返回登入</Text>
           </TouchableOpacity>
-        </View>
+          </View>
+        </ScrollView>
       </AppBackground>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 24 },
+  container: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: "center", padding: 24 },
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -345,7 +350,7 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 3
   },
-  appLogo: { width: 64, height: 64, alignSelf: "center", marginBottom: 10 },
+  appLogo: { width: 140, height: 140, alignSelf: "center", marginBottom: 16 },
   title: { fontSize: 22, fontWeight: "700", color: "#1c1917", marginBottom: 12, textAlign: "center" },
   // step indicator
   stepRow: { flexDirection: "row", justifyContent: "center", gap: 24, marginBottom: 18 },

@@ -195,7 +195,8 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
       <AppBackground variant="auth">
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
@@ -315,7 +316,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
               <View style={styles.otpRow}>
                 <TextInput
                   style={[styles.input, styles.otpInput]}
-                  placeholder="一次性驗證碼 (OTP)"
+                  placeholder="驗證碼 (OTP)"
                   placeholderTextColor="#9ca3af"
                   value={otpCode}
                   onChangeText={(t) => {
@@ -420,7 +421,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3
   },
-  appLogo: { width: 88, height: 88, alignSelf: "center", marginBottom: 12 },
+  appLogo: { width: 140, height: 140, alignSelf: "center", marginBottom: 16 },
   title: { fontSize: 24, fontWeight: "700", color: "#1c1917", marginBottom: 4, textAlign: "center" },
   subtitle: { fontSize: 14, color: "#78716c", marginBottom: 20, textAlign: "center" },
   input: {

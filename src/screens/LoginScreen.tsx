@@ -8,7 +8,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Image
+  Image,
+  ScrollView
 } from "react-native";
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
@@ -174,11 +175,13 @@ export default function LoginScreen({
     return (
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
       >
         <AppBackground variant="auth">
-          <View style={styles.card}>
-            <Image
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            <View style={styles.card}>
+              <Image
               source={require("../../assets/img/AppLogo.png")}
               style={styles.appLogo}
               resizeMode="contain"
@@ -190,7 +193,7 @@ export default function LoginScreen({
 
             <TextInput
               style={styles.otpInput}
-              placeholder="一次性驗證碼 (OTP)"
+              placeholder="驗證碼 (OTP)"
               placeholderTextColor="#9ca3af"
               value={otpCode}
               onChangeText={(t) => {
@@ -233,7 +236,8 @@ export default function LoginScreen({
             <TouchableOpacity style={styles.link} onPress={handleCancelOtp}>
               <Text style={styles.linkText}>返回登入</Text>
             </TouchableOpacity>
-          </View>
+            </View>
+          </ScrollView>
         </AppBackground>
       </KeyboardAvoidingView>
     );
@@ -243,28 +247,30 @@ export default function LoginScreen({
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior="padding"
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
     >
       <AppBackground variant="auth">
-        <View style={styles.card}>
-          <Image
-            source={require("../../assets/img/AppLogo.png")}
-            style={styles.appLogo}
-            resizeMode="contain"
-          />
-          <Text style={styles.title}>正發光</Text>
-          <Text style={styles.subtitle}>建立你的正向成長習慣</Text>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.card}>
+            <Image
+              source={require("../../assets/img/AppLogo.png")}
+              style={styles.appLogo}
+              resizeMode="contain"
+            />
+            <Text style={styles.title}>正發光</Text>
+            <Text style={styles.subtitle}>建立你的正向成長習慣</Text>
 
-          {!isFirebaseConfigured ? (
-            <View style={styles.configWarning}>
-              <Text style={styles.configWarningTitle}>無法登入</Text>
-              <Text style={styles.configWarningText}>
-                請從電腦專案目錄執行「npx expo start」，並確認專案根目錄有 .env 且已填寫 EXPO_PUBLIC_FIREBASE_* 與 Google 用戶端 ID。Expo Go 必須連到該開發伺服器才能載入 Firebase 設定。
-              </Text>
-            </View>
-          ) : (
-            <>
-              <TextInput
+            {!isFirebaseConfigured ? (
+              <View style={styles.configWarning}>
+                <Text style={styles.configWarningTitle}>無法登入</Text>
+                <Text style={styles.configWarningText}>
+                  請從電腦專案目錄執行「npx expo start」，並確認專案根目錄有 .env 且已填寫 EXPO_PUBLIC_FIREBASE_*。Expo Go 必須連到該開發伺服器才能載入 Firebase 設定。
+                </Text>
+              </View>
+            ) : (
+              <>
+                <TextInput
                 style={styles.input}
                 placeholder="電子郵件"
                 placeholderTextColor="#9ca3af"
@@ -328,27 +334,29 @@ export default function LoginScreen({
               >
                 <Text style={styles.linkText}>還沒有帳號？按此註冊</Text>
               </TouchableOpacity>
-            </>
-          )}
-        </View>
+              </>
+            )}
+          </View>
+        </ScrollView>
       </AppBackground>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 24 },
+  container: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: "center", padding: 24 },
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
     padding: 24,
     shadowColor: "#d56c2f",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
     elevation: 3
   },
-  appLogo: { width: 88, height: 88, alignSelf: "center", marginBottom: 12 },
+  appLogo: { width: 140, height: 140, alignSelf: "center", marginBottom: 16 },
   title: { fontSize: 24, fontWeight: "700", color: "#1c1917", marginBottom: 4, textAlign: "center" },
   subtitle: { fontSize: 14, color: "#78716c", marginBottom: 20, textAlign: "center" },
   input: {

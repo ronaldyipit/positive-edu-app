@@ -78,7 +78,7 @@ function randomPulseIntervalSec() {
 
 const TIME_GUESS_OPTIONS = [5, 10, 15, 20, 25, 30, 40, 45, 60];
 const SAFETY_CONTACT_KEY = "@deep_dive_safety_contact";
-const LONG_PRESS_EXIT_SEC = 10;
+const LONG_PRESS_EXIT_SEC = 5;
 
 /** 將電話轉成 WhatsApp 用的國際格式（僅數字，可選加 852） */
 function toWhatsAppPhone(raw: string): string | null {

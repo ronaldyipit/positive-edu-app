@@ -164,9 +164,11 @@ export default function HomeScreen({
                       </View>
                     </View>
                     <Text style={[styles.cardTitle, { color: m.accent }]} numberOfLines={1}>{m.title}</Text>
-                    <Text style={styles.cardDesc} numberOfLines={2}>{m.desc}</Text>
-                    <View style={[styles.chevronWrap, { backgroundColor: m.accent }]}>
-                      <Ionicons name="chevron-forward" size={16} color="#fff" />
+                    <Text style={styles.cardDesc} numberOfLines={3}>{m.desc}</Text>
+                    <View style={styles.chevronRow}>
+                      <View style={[styles.chevronWrap, { backgroundColor: m.accent }]}>
+                        <Ionicons name="chevron-forward" size={14} color="#fff" />
+                      </View>
                     </View>
                   </TouchableOpacity>
                 </Animated.View>
@@ -194,7 +196,7 @@ const styles = StyleSheet.create({
   },
   scroll: { flex: 1 },
   scrollContent: { padding: 20, paddingBottom: 32 },
-  appLogo: { width: 72, height: 72, alignSelf: "center", marginBottom: 8 },
+  appLogo: { width: 120, height: 120, alignSelf: "center", marginBottom: 12 },
   title: {
     fontSize: 24,
     fontWeight: "800",
@@ -277,15 +279,17 @@ const styles = StyleSheet.create({
     color: "#64748b",
     lineHeight: 15,
     textAlign: "center",
-    marginBottom: 8
+    marginBottom: 6
+  },
+  chevronRow: {
+    width: "100%",
+    alignItems: "flex-end",
+    marginTop: "auto"
   },
   chevronWrap: {
-    position: "absolute",
-    bottom: 10,
-    right: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center"
   }
