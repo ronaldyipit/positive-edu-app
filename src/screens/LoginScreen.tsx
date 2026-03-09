@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,166 +10,306 @@ import {
   ActivityIndicator,
   Image
 } from "react-native";
+import Constants from "expo-constants";
 import { useAuth } from "../contexts/AuthContext";
 import { AppBackground } from "../components/AppBackground";
+
+const API_BASE =
+  process.env.EXPO_PUBLIC_COACH_API_URL ||
+  (Constants.expoConfig as { extra?: { coachApiUrl?: string } })?.extra?.coachApiUrl ||
+  "https://positive-edu-app.vercel.app";
 
 export default function LoginScreen({
   navigation
 }: {
   navigation: { navigate: (name: string) => void };
 }) {
-  const { signIn, signInWithGoogle, googleLoading, authError, clearAuthError, isFirebaseConfigured } = useAuth();
+  const {
+    signIn, authError, clearAuthError, isFirebaseConfigured,
+    user, pendingOtp, confirmOtp, cancelOtp
+  } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  // OTP state
+  const [otpCode, setOtpCode] = useState("");
+  const [otpToken, setOtpToken] = useState<string | null>(null);
+  const [otpExpiresAt, setOtpExpiresAt] = useState<number>(0);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
-    return () => clearAuthError();
+    return () => {
+      clearAuthError();
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
   }, [clearAuthError]);
+
+  // Auto-send OTP once login succeeds (pendingOtp becomes true)
+  const hasSentOtp = useRef(false);
+  useEffect(() => {
+    if (pendingOtp && user && !hasSentOtp.current) {
+      hasSentOtp.current = true;
+      sendOtp(user.email || email.trim());
+    }
+  }, [pendingOtp, user]);
+
+  const startCountdown = () => {
+    setCountdown(60);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+  };
+
+  const sendOtp = async (toEmail: string) => {
+    setOtpSending(true);
+    setOtpError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: toEmail })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "發送驗證碼失敗");
+      setOtpToken(data.token);
+      setOtpExpiresAt(data.expiresAt);
+      startCountdown();
+    } catch (e: unknown) {
+      setOtpError(e instanceof Error ? e.message : "發送驗證碼失敗");
+    } finally {
+      setOtpSending(false);
+    }
+  };
 
   const handleLogin = async () => {
     setLocalError(null);
     clearAuthError();
-    if (!email.trim()) {
-      setLocalError("請輸入電子郵件。");
-      return;
-    }
-    if (!password) {
-      setLocalError("請輸入密碼。");
-      return;
-    }
+    if (!email.trim()) { setLocalError("請輸入電子郵件。"); return; }
+    if (!password) { setLocalError("請輸入密碼。"); return; }
     if (loading) return;
     setLoading(true);
+    hasSentOtp.current = false;
     try {
       await signIn(email.trim(), password);
     } catch {
-      // authError 已由 AuthContext 設定
+      // authError set by AuthContext
     } finally {
       setLoading(false);
     }
   };
 
-  const displayError = localError || authError;
-  const isAnyLoading = loading || googleLoading;
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim()) { setOtpError("請輸入驗證碼。"); return; }
+    if (!otpToken) { setOtpError("請先發送驗證碼。"); return; }
+    setOtpVerifying(true);
+    setOtpError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: (user?.email || email.trim()).toLowerCase(),
+          otp: otpCode.trim(),
+          token: otpToken,
+          expiresAt: otpExpiresAt
+        })
+      });
+      const data = await res.json();
+      if (data.valid) {
+        confirmOtp();
+      } else {
+        setOtpError(data.error || "驗證碼不正確。");
+      }
+    } catch (e: unknown) {
+      setOtpError(e instanceof Error ? e.message : "驗證失敗，請稍後再試。");
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
 
+  const handleCancelOtp = async () => {
+    hasSentOtp.current = false;
+    setOtpCode("");
+    setOtpToken(null);
+    setOtpError(null);
+    setCountdown(0);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    await cancelOtp();
+  };
+
+  const displayError = localError || authError;
+  const showOtpStep = pendingOtp && user;
+
+  // ── OTP verification step ──
+  if (showOtpStep) {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <AppBackground variant="auth">
+          <View style={styles.card}>
+            <Image
+              source={require("../../assets/img/AppLogo.png")}
+              style={styles.appLogo}
+              resizeMode="contain"
+            />
+            <Text style={styles.title}>電郵驗證</Text>
+            <Text style={styles.subtitle}>
+              驗證碼已發送至 {user.email || email}
+            </Text>
+
+            <TextInput
+              style={styles.otpInput}
+              placeholder="輸入 6 位驗證碼"
+              placeholderTextColor="#9ca3af"
+              value={otpCode}
+              onChangeText={(t) => {
+                setOtpCode(t.replace(/[^0-9]/g, "").slice(0, 6));
+                setOtpError(null);
+              }}
+              keyboardType="number-pad"
+              maxLength={6}
+              autoFocus
+            />
+
+            {otpError ? <Text style={styles.error}>{otpError}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.primaryButton, otpVerifying && styles.buttonDisabled]}
+              onPress={handleVerifyOtp}
+              disabled={otpVerifying}
+            >
+              {otpVerifying ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>驗證</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.resendButton, (countdown > 0 || otpSending) && styles.buttonDisabled]}
+              onPress={() => sendOtp(user.email || email.trim())}
+              disabled={countdown > 0 || otpSending}
+            >
+              {otpSending ? (
+                <ActivityIndicator color="#d56c2f" />
+              ) : (
+                <Text style={styles.resendText}>
+                  {countdown > 0 ? `重新發送（${countdown}s）` : "重新發送驗證碼"}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.link} onPress={handleCancelOtp}>
+              <Text style={styles.linkText}>返回登入</Text>
+            </TouchableOpacity>
+          </View>
+        </AppBackground>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ── Login form ──
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <AppBackground variant="auth">
-      <View style={styles.card}>
-        <Image
-          source={require("../../assets/img/AppLogo.png")}
-          style={styles.appLogo}
-          resizeMode="contain"
-        />
-        <Text style={styles.title}>正發光</Text>
-        <Text style={styles.subtitle}>建立你的正向成長習慣</Text>
+        <View style={styles.card}>
+          <Image
+            source={require("../../assets/img/AppLogo.png")}
+            style={styles.appLogo}
+            resizeMode="contain"
+          />
+          <Text style={styles.title}>正發光</Text>
+          <Text style={styles.subtitle}>建立你的正向成長習慣</Text>
 
-        {!isFirebaseConfigured ? (
-          <View style={styles.configWarning}>
-            <Text style={styles.configWarningTitle}>無法登入</Text>
-            <Text style={styles.configWarningText}>
-              請從電腦專案目錄執行「npx expo start」，並確認專案根目錄有 .env 且已填寫 EXPO_PUBLIC_FIREBASE_* 與 Google 用戶端 ID。Expo Go 必須連到該開發伺服器才能載入 Firebase 設定。
-            </Text>
-          </View>
-        ) : (
-          <>
-        {/* Google 登入（主要按鈕） */}
-        <TouchableOpacity
-          style={[styles.googleButton, isAnyLoading && styles.buttonDisabled]}
-          onPress={signInWithGoogle}
-          disabled={isAnyLoading}
-        >
-          {googleLoading ? (
-            <ActivityIndicator color="#d56c2f" />
-          ) : (
-            <View style={styles.googleRow}>
-              <Image
-                source={require("../../assets/img/Google Logo.png")}
-                style={styles.googleLogo}
-                resizeMode="contain"
-              />
-              <Text style={styles.googleText}>以 Google 帳號登入</Text>
+          {!isFirebaseConfigured ? (
+            <View style={styles.configWarning}>
+              <Text style={styles.configWarningTitle}>無法登入</Text>
+              <Text style={styles.configWarningText}>
+                請從電腦專案目錄執行「npx expo start」，並確認專案根目錄有 .env 且已填寫 EXPO_PUBLIC_FIREBASE_* 與 Google 用戶端 ID。Expo Go 必須連到該開發伺服器才能載入 Firebase 設定。
+              </Text>
             </View>
-          )}
-        </TouchableOpacity>
-
-        {/* 分隔線 */}
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>或</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Email / 密碼（次要選項） */}
-        <TextInput
-          style={styles.input}
-          placeholder="電子郵件"
-          placeholderTextColor="#9ca3af"
-          value={email}
-          onChangeText={(t) => {
-            setEmail(t);
-            setLocalError(null);
-            clearAuthError();
-          }}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          autoComplete="email"
-          editable={!isAnyLoading}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="密碼"
-          placeholderTextColor="#9ca3af"
-          value={password}
-          onChangeText={(t) => {
-            setPassword(t);
-            setLocalError(null);
-            clearAuthError();
-          }}
-          secureTextEntry
-          autoComplete="password"
-          editable={!isAnyLoading}
-        />
-
-        {displayError ? <Text style={styles.error}>{displayError}</Text> : null}
-
-        <TouchableOpacity
-          style={[styles.emailButton, isAnyLoading && styles.buttonDisabled]}
-          onPress={handleLogin}
-          disabled={isAnyLoading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.emailButtonText}>以電子郵件登入</Text>
-          )}
-        </TouchableOpacity>
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="電子郵件"
+                placeholderTextColor="#9ca3af"
+                value={email}
+                onChangeText={(t) => {
+                  setEmail(t);
+                  setLocalError(null);
+                  clearAuthError();
+                }}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+                editable={!loading}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="密碼"
+                placeholderTextColor="#9ca3af"
+                value={password}
+                onChangeText={(t) => {
+                  setPassword(t);
+                  setLocalError(null);
+                  clearAuthError();
+                }}
+                secureTextEntry
+                autoComplete="password"
+                editable={!loading}
+              />
 
-        <TouchableOpacity
-          style={styles.link}
-          onPress={() => navigation.navigate("Register")}
-          disabled={isAnyLoading}
-        >
-          <Text style={styles.linkText}>還沒有帳號？按此註冊</Text>
-        </TouchableOpacity>
-          </>
-        )}
-      </View>
+              {displayError ? <Text style={styles.error}>{displayError}</Text> : null}
+
+              <TouchableOpacity
+                style={[styles.primaryButton, loading && styles.buttonDisabled]}
+                onPress={handleLogin}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>登入</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.link}
+                onPress={() => navigation.navigate("Register")}
+                disabled={loading}
+              >
+                <Text style={styles.linkText}>還沒有帳號？按此註冊</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
       </AppBackground>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 24
-  },
+  container: { flex: 1, justifyContent: "center", padding: 24 },
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -180,63 +320,9 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 3
   },
-  appLogo: {
-    width: 88,
-    height: 88,
-    alignSelf: "center",
-    marginBottom: 12
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1c1917",
-    marginBottom: 4,
-    textAlign: "center"
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#78716c",
-    marginBottom: 20,
-    textAlign: "center"
-  },
-  googleButton: {
-    borderWidth: 1.5,
-    borderColor: "#fde68a",
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "#fff",
-    marginBottom: 16
-  },
-  googleRow: {
-    flexDirection: "row",
-    alignItems: "center"
-  },
-  googleLogo: {
-    width: 22,
-    height: 22,
-    marginRight: 10
-  },
-  googleText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1c1917"
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#fde68a"
-  },
-  dividerText: {
-    marginHorizontal: 10,
-    fontSize: 13,
-    color: "#b45309"
-  },
+  appLogo: { width: 88, height: 88, alignSelf: "center", marginBottom: 12 },
+  title: { fontSize: 24, fontWeight: "700", color: "#1c1917", marginBottom: 4, textAlign: "center" },
+  subtitle: { fontSize: 14, color: "#78716c", marginBottom: 20, textAlign: "center" },
   input: {
     borderWidth: 1,
     borderColor: "#fde68a",
@@ -247,16 +333,37 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     backgroundColor: "#fffbeb"
   },
+  otpInput: {
+    borderWidth: 2,
+    borderColor: "#d56c2f",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    fontSize: 24,
+    letterSpacing: 8,
+    textAlign: "center",
+    marginBottom: 16,
+    backgroundColor: "#fffbeb"
+  },
   error: { color: "#dc2626", fontSize: 13, marginBottom: 8 },
-  emailButton: {
+  primaryButton: {
     backgroundColor: "#d56c2f",
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
     marginTop: 4
   },
+  primaryButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   buttonDisabled: { opacity: 0.6 },
-  emailButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  resendButton: {
+    borderWidth: 1.5,
+    borderColor: "#fde68a",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 12
+  },
+  resendText: { color: "#d56c2f", fontSize: 14, fontWeight: "600" },
   link: { marginTop: 16, alignItems: "center" },
   linkText: { color: "#d56c2f", fontSize: 14 },
   configWarning: {

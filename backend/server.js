@@ -1,11 +1,32 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 const OpenAI = require("openai");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ── OTP helpers (stateless HMAC — no DB needed, works on Vercel serverless) ──
+const OTP_SECRET = process.env.OTP_SECRET || "change-me-to-a-random-string";
+const OTP_EXPIRY_MS = 5 * 60 * 1000;
+
+const smtpTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: parseInt(process.env.SMTP_PORT || "587", 10),
+  secure: process.env.SMTP_SECURE === "true",
+  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+});
+
+function generateOtp() {
+  return crypto.randomInt(100000, 999999).toString();
+}
+
+function hmacOtp(email, otp, expiresAt) {
+  return crypto.createHmac("sha256", OTP_SECRET).update(`${email}:${otp}:${expiresAt}`).digest("hex");
+}
 
 const poeApiKey = process.env.POE_API_KEY;
 
@@ -17,6 +38,56 @@ const client = new OpenAI({
 // 根路徑：方便確認 API 已部署（瀏覽器開根網址唔會再顯示 Cannot GET /）
 app.get("/", (req, res) => {
   res.json({ ok: true, message: "Positive Edu API is running. Use /api/coach, /api/gratitude-text, etc." });
+});
+
+// ── OTP：發送驗證碼 ──
+app.post("/api/send-otp", async (req, res) => {
+  const { email } = req.body || {};
+  if (!email?.trim()) return res.status(400).json({ error: "email is required." });
+
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return res.status(503).json({ error: "SMTP not configured on server." });
+  }
+
+  const normalised = email.trim().toLowerCase();
+  const otp = generateOtp();
+  const expiresAt = Date.now() + OTP_EXPIRY_MS;
+  const token = hmacOtp(normalised, otp, expiresAt);
+
+  try {
+    await smtpTransporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: normalised,
+      subject: "正發光 — 電郵驗證碼",
+      html:
+        `<div style="font-family:sans-serif;max-width:420px;margin:auto;padding:24px">` +
+        `<h2 style="color:#d56c2f">正發光 驗證碼</h2>` +
+        `<p>你的驗證碼是：</p>` +
+        `<p style="font-size:32px;letter-spacing:6px;font-weight:bold;color:#1c1917">${otp}</p>` +
+        `<p style="color:#78716c;font-size:13px">此驗證碼將於 5 分鐘後失效。如非本人操作，請忽略此郵件。</p>` +
+        `</div>`
+    });
+  } catch (err) {
+    console.error("send-otp mail error:", err);
+    return res.status(500).json({ error: "發送驗證碼失敗，請稍後再試。" });
+  }
+
+  res.json({ token, expiresAt });
+});
+
+// ── OTP：驗證碼驗證 ──
+app.post("/api/verify-otp", (req, res) => {
+  const { email, otp, token, expiresAt } = req.body || {};
+  if (!email || !otp || !token || !expiresAt) {
+    return res.status(400).json({ valid: false, error: "Missing parameters." });
+  }
+  if (Date.now() > expiresAt) {
+    return res.json({ valid: false, error: "驗證碼已過期，請重新發送。" });
+  }
+  const normalised = email.trim().toLowerCase();
+  const expected = hmacOtp(normalised, otp.trim(), expiresAt);
+  const valid = expected === token;
+  res.json({ valid, ...(valid ? {} : { error: "驗證碼不正確。" }) });
 });
 
 app.post("/api/coach", async (req, res) => {

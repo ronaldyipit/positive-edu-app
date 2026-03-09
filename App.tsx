@@ -59,7 +59,7 @@ function MainTabs() {
 }
 
 function RootNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, pendingOtp } = useAuth();
 
   if (loading) {
     return (
@@ -77,7 +77,7 @@ function RootNavigator() {
     );
   }
 
-  return user ? <MainTabs /> : <AuthNavigator />;
+  return user && !pendingOtp ? <MainTabs /> : <AuthNavigator />;
 }
 
 export default function App() {
