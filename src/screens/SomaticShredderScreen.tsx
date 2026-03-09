@@ -14,7 +14,7 @@ import {
 import { Accelerometer } from "expo-sensors";
 import { AppBackground } from "../components/AppBackground";
 
-const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "http://localhost:4000";
+const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "https://positive-edu-app.vercel.app";
 
 const ENCOURAGEMENTS = [
   "做得好！壓力已被你親手粉碎了 💪",

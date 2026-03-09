@@ -14,6 +14,11 @@ const client = new OpenAI({
   baseURL: "https://api.poe.com/v1"
 });
 
+// 根路徑：方便確認 API 已部署（瀏覽器開根網址唔會再顯示 Cannot GET /）
+app.get("/", (req, res) => {
+  res.json({ ok: true, message: "Positive Edu API is running. Use /api/coach, /api/gratitude-text, etc." });
+});
+
 app.post("/api/coach", async (req, res) => {
   try {
     if (!poeApiKey) {

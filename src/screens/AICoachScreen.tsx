@@ -75,7 +75,7 @@ function parseBoldSegments(str: string): { text: string; bold: boolean }[] {
 
 // Use .env EXPO_PUBLIC_COACH_API_URL for backend URL (e.g. http://192.168.68.120:4000 on LAN).
 // Default: localhost so backend runs on same machine.
-const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "http://localhost:4000";
+const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "https://positive-edu-app.vercel.app";
 
 // VIA 性格優勢（Seligman & Peterson）：6 種美德 × 24 項，讓使用者「自己想 3 個凸顯優勢」
 const VIRTUE_STRENGTHS: { virtue: string; strengths: { id: string; label: string; emoji: string }[] }[] = [

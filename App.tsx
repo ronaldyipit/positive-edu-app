@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, ActivityIndicator, StyleSheet, Image } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { AppBackground } from "./src/components/AppBackground";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -81,16 +82,21 @@ function RootNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <StatusBar style="dark" />
-        <RootNavigator />
-      </NavigationContainer>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar style="dark" />
+          <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+            <RootNavigator />
+          </SafeAreaView>
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: "#fefce8" },
   loading: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingLogo: { width: 80, height: 80, marginBottom: 16 },
   loadingText: { marginTop: 8, fontSize: 14, color: "#78716c" }

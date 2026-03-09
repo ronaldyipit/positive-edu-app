@@ -28,6 +28,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
 
   useEffect(() => {
     return () => clearAuthError();
@@ -36,6 +37,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
   const handleRegister = async () => {
     setLocalError(null);
     clearAuthError();
+    setRegisterSuccess(false);
     if (!displayName.trim()) {
       setLocalError("請輸入用戶名稱。");
       return;
@@ -63,6 +65,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
     setLoading(true);
     try {
       await signUp(email.trim(), password, displayName.trim(), grade);
+      setRegisterSuccess(true);
     } catch {
       // authError 由 AuthContext 設定
     } finally {
@@ -197,6 +200,11 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
         />
 
         {displayError ? <Text style={styles.error}>{displayError}</Text> : null}
+        {registerSuccess ? (
+          <View style={styles.successBanner}>
+            <Text style={styles.successText}>註冊成功！正在自動登入…</Text>
+          </View>
+        ) : null}
 
         <TouchableOpacity
           style={[styles.button, (loading || !isFirebaseConfigured) && styles.buttonDisabled]}
@@ -310,6 +318,16 @@ const styles = StyleSheet.create({
   gradeOptionActive: { backgroundColor: "#fff7ed" },
   gradeOptionText: { fontSize: 16, color: "#374151" },
   gradeOptionTextActive: { fontWeight: "600", color: "#d56c2f" },
+  successBanner: {
+    backgroundColor: "#dcfce7",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#22c55e",
+    alignItems: "center"
+  },
+  successText: { fontSize: 15, fontWeight: "600", color: "#166534" },
   configWarning: {
     backgroundColor: "#fef3c7",
     borderRadius: 12,

@@ -22,24 +22,35 @@ export default function LoginScreen({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
     return () => clearAuthError();
   }, [clearAuthError]);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password || loading) return;
-    setLoading(true);
+    setLocalError(null);
     clearAuthError();
+    if (!email.trim()) {
+      setLocalError("請輸入電子郵件。");
+      return;
+    }
+    if (!password) {
+      setLocalError("請輸入密碼。");
+      return;
+    }
+    if (loading) return;
+    setLoading(true);
     try {
       await signIn(email.trim(), password);
     } catch {
-      // 錯誤已由 AuthContext 設為 authError
+      // authError 已由 AuthContext 設定
     } finally {
       setLoading(false);
     }
   };
 
+  const displayError = localError || authError;
   const isAnyLoading = loading || googleLoading;
 
   return (
@@ -101,6 +112,7 @@ export default function LoginScreen({
           value={email}
           onChangeText={(t) => {
             setEmail(t);
+            setLocalError(null);
             clearAuthError();
           }}
           autoCapitalize="none"
@@ -115,6 +127,7 @@ export default function LoginScreen({
           value={password}
           onChangeText={(t) => {
             setPassword(t);
+            setLocalError(null);
             clearAuthError();
           }}
           secureTextEntry
@@ -122,7 +135,7 @@ export default function LoginScreen({
           editable={!isAnyLoading}
         />
 
-        {authError ? <Text style={styles.error}>{authError}</Text> : null}
+        {displayError ? <Text style={styles.error}>{displayError}</Text> : null}
 
         <TouchableOpacity
           style={[styles.emailButton, isAnyLoading && styles.buttonDisabled]}

@@ -16,7 +16,7 @@ import * as IntentLauncher from "expo-intent-launcher";
 import { AppBackground } from "../components/AppBackground";
 import * as MediaLibrary from "expo-media-library";
 
-const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "http://localhost:4000";
+const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "https://positive-edu-app.vercel.app";
 
 const THEMES = [
   { name: "暖陽", bg: "#fefce8", border: "#fde047", title: "#854d0e", body: "#78350f", accent: "#fbbf24", emoji: "🌻" },
