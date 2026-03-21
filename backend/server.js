@@ -7,7 +7,6 @@ const path = require("path");
 const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
 const OpenAI = require("openai");
-const pdfParse = require("pdf-parse");
 
 // ── Firebase Admin（用於伺服器端重設密碼） ──
 if (!admin.apps.length && process.env.FIREBASE_PROJECT_ID) {
@@ -51,6 +50,12 @@ const client = new OpenAI({
 });
 
 // ── Geelong Positive Education PDF RAG (local retrieval) ───────────────────
+const RAG_ENABLED =
+  process.env.RAG_ENABLED != null
+    ? process.env.RAG_ENABLED === "true"
+    : process.env.VERCEL
+    ? false
+    : true;
 const RAG_PDF_PATH =
   process.env.RAG_PDF_PATH ||
   path.join(__dirname, "..", "assets", "RAG", "Positive Education_ The Geelong Grammar School Journey --.pdf");
@@ -67,6 +72,7 @@ const STOPWORDS = new Set([
 
 let ragChunks = [];
 let ragLoaded = false;
+let ragLoading = false;
 
 function normalizeText(s) {
   return String(s || "")
@@ -125,7 +131,19 @@ function buildRagContext(query, maxChunks = 3) {
 }
 
 async function loadRagPdf() {
+  if (!RAG_ENABLED || ragLoaded || ragLoading) return;
+  ragLoading = true;
   try {
+    let pdfParse;
+    try {
+      // Optional import: if unavailable on serverless, keep API alive and disable RAG.
+      pdfParse = require("pdf-parse");
+    } catch (e) {
+      console.warn("[RAG] pdf-parse not available. Disable RAG for this runtime.");
+      ragChunks = [];
+      ragLoaded = false;
+      return;
+    }
     if (!fs.existsSync(RAG_PDF_PATH)) {
       console.warn("[RAG] PDF not found:", RAG_PDF_PATH);
       ragChunks = [];
@@ -142,9 +160,10 @@ async function loadRagPdf() {
     console.error("[RAG] Failed to load Geelong PDF:", err?.message || err);
     ragChunks = [];
     ragLoaded = false;
+  } finally {
+    ragLoading = false;
   }
 }
-loadRagPdf();
 
 // 根路徑：方便確認 API 已部署（瀏覽器開根網址唔會再顯示 Cannot GET /）
 app.get("/", (req, res) => {
@@ -265,9 +284,14 @@ app.post("/api/coach", async (req, res) => {
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "messages array is required." });
     }
+    if (RAG_ENABLED && !ragLoaded && !ragLoading) {
+      // Lazy-load on demand to avoid serverless cold-start crashes.
+      loadRagPdf().catch(() => {});
+    }
+
     const latestUserMsg =
       [...messages].reverse().find((m) => m?.role === "user" && typeof m?.content === "string")?.content || "";
-    const ragContext = buildRagContext(latestUserMsg, RAG_MAX_CHUNKS);
+    const ragContext = RAG_ENABLED ? buildRagContext(latestUserMsg, RAG_MAX_CHUNKS) : "";
 
     // 根據學生選擇的 Signature Strengths 動態調整 system prompt
     const strengthsClause =
