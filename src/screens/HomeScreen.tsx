@@ -29,7 +29,7 @@ const MODULES = [
   {
     id: "離線深潛",
     title: "離線深潛",
-    desc: "深潛模式、報平安簡訊、長按 10 秒解鎖，專注當下",
+    desc: "深潛模式、報平安簡訊、長按 5 秒結束，專注當下",
     emoji: "🌊",
     accent: "#2563eb",
     bg: "#eff6ff",

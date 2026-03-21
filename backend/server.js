@@ -143,6 +143,19 @@ app.post("/api/reset-password", async (req, res) => {
   }
 });
 
+/** 供 AI 教練回答「App 點用」—須與實際 Tab／功能一致 */
+const ZHENG_FA_GUANG_APP_GUIDE = `
+【正發光 App 功能速覽 — 只作事實說明用】
+底部有六個分頁（名稱以畫面為準）：
+1) 主頁：進入各模組的入口、簡短介紹；可看到等級與 EXP 總覽（每 100 EXP 升一級，共 10 個級名）。
+2) 正向教練（你而家呢頁）：先選 3 個「性格優勢」，再同 AI 教練傾偈；可用情緒快捷句開場。若從「離線深潛」帶過嚟，輸入框可預填深潛心得。
+3) 離線深潛：專注計時、可選時長；開始前可發「報平安」WhatsApp／SMS；有「什麼是心流」說明；計時中可長按約 5 秒提早結束。完整跑完一次（無提早結束）可獲 +20 EXP；結束後有時間感回顧，亦可一鍵帶內容返嚟正向教練傾。
+4) 抒壓（畫面標題：抒壓碎紙機）：寫低煩惱／壓力 → 搖機碎紙動畫 → 跟住做呼吸練習，幫身體同心情暫時鬆一鬆。
+5) 感恩（分頁標籤顯示：火炬傳暖）：三種方式—寫感謝訊息（成功傳送 +20 EXP）、默默報答同一個人（標記完成 +15）、把善意傳揚開去（標記完成 +30）；有「火炬行動簿」記錄任務，未完成可編輯／分頁瀏覽。
+6) 設定：帳戶與等級詳情、登出等。
+說明：EXP 獎勵以裝置內記錄為準；唔好承諾 App 冇寫明嘅功能。若使用者問到指南冇寫嘅細節，請話「我唔肯定呢項設定」並建議佢喺相關分頁試下或睇畫面說明。
+`.trim();
+
 app.post("/api/coach", async (req, res) => {
   try {
     if (!poeApiKey) {
@@ -172,6 +185,12 @@ app.post("/api/coach", async (req, res) => {
       "You do NOT diagnose, label, or give clinical or crisis advice. " +
       "You focus on PERMA Meaning: helping students find meaning, notice character strengths, and build resilience. " +
       "Keep a warm, hopeful, and non-judgmental tone. Respond in 2-4 sentences maximum per reply. " +
+      "APP HELP EXCEPTION: If the user is clearly asking how the app works, where to find a feature, what a tab does, or how to get EXP, " +
+      "answer factually using ONLY the guide below (do not invent features). Use up to 5 short sentences; a closing Socratic question is optional. " +
+      "If the guide does not cover their question, say honestly that you are unsure and suggest they open that tab or check on-screen hints. " +
+      "\n\n" +
+      ZHENG_FA_GUANG_APP_GUIDE +
+      "\n\n" +
       "If the user hints at self-harm or severe distress, encourage them to seek immediate help from a trusted adult, " +
       "school social worker, or call the Samaritan Befrienders Hong Kong hotline 2389-2222. " +
       "When the user clearly expresses worry, rumination, or a problem that cannot be fixed right away, you may briefly say in Traditional Chinese " +
