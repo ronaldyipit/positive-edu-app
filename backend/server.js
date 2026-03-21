@@ -56,12 +56,9 @@ const RAG_ENABLED =
     : process.env.VERCEL
     ? false
     : true;
-const RAG_PDF_PATH =
-  process.env.RAG_PDF_PATH ||
-  path.join(__dirname, "..", "assets", "RAG", "Positive Education_ The Geelong Grammar School Journey --.pdf");
+const RAG_CHUNKS_JSON_PATH =
+  process.env.RAG_CHUNKS_JSON_PATH || path.join(__dirname, "rag", "geelong_chunks.json");
 const RAG_MAX_CHUNKS = Number(process.env.RAG_MAX_CHUNKS || 3);
-const RAG_CHUNK_SIZE = Number(process.env.RAG_CHUNK_SIZE || 900);
-const RAG_CHUNK_OVERLAP = Number(process.env.RAG_CHUNK_OVERLAP || 180);
 const STOPWORDS = new Set([
   "the", "and", "for", "that", "this", "with", "from", "have", "your", "you", "are", "not", "but",
   "what", "when", "where", "will", "into", "about", "can", "how", "they", "their", "our", "was",
@@ -78,20 +75,6 @@ function normalizeText(s) {
   return String(s || "")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function splitIntoChunks(text, size = 900, overlap = 180) {
-  const t = normalizeText(text);
-  if (!t) return [];
-  const out = [];
-  let start = 0;
-  while (start < t.length) {
-    const end = Math.min(t.length, start + size);
-    out.push(t.slice(start, end));
-    if (end >= t.length) break;
-    start = Math.max(0, end - overlap);
-  }
-  return out;
 }
 
 function tokenizeForSearch(text) {
@@ -131,33 +114,27 @@ function buildRagContext(query, maxChunks = 3) {
 }
 
 async function loadRagPdf() {
+  // Deprecated: keep function name to minimize refactor footprint.
   if (!RAG_ENABLED || ragLoaded || ragLoading) return;
   ragLoading = true;
   try {
-    let pdfParse;
-    try {
-      // Optional import: if unavailable on serverless, keep API alive and disable RAG.
-      pdfParse = require("pdf-parse");
-    } catch (e) {
-      console.warn("[RAG] pdf-parse not available. Disable RAG for this runtime.");
+    if (!fs.existsSync(RAG_CHUNKS_JSON_PATH)) {
+      console.warn("[RAG] chunks json not found:", RAG_CHUNKS_JSON_PATH);
       ragChunks = [];
       ragLoaded = false;
       return;
     }
-    if (!fs.existsSync(RAG_PDF_PATH)) {
-      console.warn("[RAG] PDF not found:", RAG_PDF_PATH);
-      ragChunks = [];
-      ragLoaded = false;
-      return;
-    }
-    const buffer = fs.readFileSync(RAG_PDF_PATH);
-    const data = await pdfParse(buffer);
-    const chunks = splitIntoChunks(data?.text || "", RAG_CHUNK_SIZE, RAG_CHUNK_OVERLAP);
-    ragChunks = chunks.map((text) => ({ text, lower: text.toLowerCase() }));
+    const raw = fs.readFileSync(RAG_CHUNKS_JSON_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    const chunks = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.chunks) ? parsed.chunks : [];
+    ragChunks = chunks
+      .map((c) => normalizeText(typeof c === "string" ? c : c?.text))
+      .filter(Boolean)
+      .map((text) => ({ text, lower: text.toLowerCase() }));
     ragLoaded = ragChunks.length > 0;
-    console.log(`[RAG] Loaded Geelong PDF chunks: ${ragChunks.length}`);
+    console.log(`[RAG] Loaded prebuilt chunks: ${ragChunks.length}`);
   } catch (err) {
-    console.error("[RAG] Failed to load Geelong PDF:", err?.message || err);
+    console.error("[RAG] Failed to load chunk json:", err?.message || err);
     ragChunks = [];
     ragLoaded = false;
   } finally {
