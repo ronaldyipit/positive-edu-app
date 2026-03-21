@@ -10,7 +10,8 @@ import {
   Platform,
   Image,
   Animated,
-  Linking
+  Linking,
+  Modal
 } from "react-native";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
@@ -99,6 +100,7 @@ export default function GratitudeCardScreen() {
   const rightGlow = useRef(new Animated.Value(0)).current;
   const transferringRef = useRef(false);
   const [showCompleteRelay, setShowCompleteRelay] = useState(false);
+  const [showGratitudeIntroModal, setShowGratitudeIntroModal] = useState(false);
   const completeTravel = useRef(new Animated.Value(0)).current;
   const completeRightGlow = useRef(new Animated.Value(0)).current;
   const completeOverlayOpacity = useRef(new Animated.Value(0)).current;
@@ -537,6 +539,25 @@ export default function GratitudeCardScreen() {
         <Text style={styles.expHintItem}>🤝 默默報答同一個人（標記完成） +15</Text>
         <Text style={styles.expHintItem}>🔥 把善意傳揚開去（標記完成） +30</Text>
       </View>
+      <View style={styles.resonanceBlock}>
+        <Text style={styles.resonanceText}>
+          有時唔係冇人幫你，只係忙到連一句多謝都未講出口。{"\n"}
+          感恩唔係要你煽情，而係幫你記得：你唔係一個人，身邊一直有人同善意撐住你。
+        </Text>
+      </View>
+      <TouchableOpacity style={styles.infoTriggerBtn} onPress={() => setShowGratitudeIntroModal(true)}>
+        <Text style={styles.infoTriggerText}>甚麼是感恩？（按此查看）</Text>
+      </TouchableOpacity>
+      <View style={styles.moduleTaskBlock}>
+        <Text style={styles.moduleTaskTitle}>呢個 Module 做咩？</Text>
+        <Text style={styles.moduleTaskText}>
+          你可以用三種方式回應善意：{"\n"}
+          1) 寫感謝訊息，直接向對方表達謝意{"\n"}
+          2) 默默報答同一個人，用行動回應佢對你嘅好{"\n"}
+          3) 把善意傳揚開去，將呢份好意傳去下一個人{"\n\n"}
+          完成後會記錄喺「火炬行動簿」，方便你慢慢實踐。
+        </Text>
+      </View>
       <View style={styles.torchRelayBox}>
         <Animated.Text
           style={[
@@ -854,6 +875,25 @@ export default function GratitudeCardScreen() {
     </ScrollView>
       </View>
     </View>
+    <Modal
+      visible={showGratitudeIntroModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowGratitudeIntroModal(false)}
+    >
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowGratitudeIntroModal(false)}>
+        <TouchableOpacity style={styles.modalCard} activeOpacity={1} onPress={() => {}}>
+          <Text style={styles.modalTitle}>甚麼是感恩？</Text>
+          <Text style={styles.modalBody}>
+            感恩（gratitude）係有意識地留意並珍惜自己收到嘅幫助、善意同支持，並願意以說話或行動表達謝意。{"\n\n"}
+            感恩唔係忽略困難，而係喺壓力之中仍然睇到資源同連結，令自己更有力量面對下一步。
+          </Text>
+          <TouchableOpacity style={[styles.generateBtn, { alignSelf: "stretch", marginTop: 14 }]} onPress={() => setShowGratitudeIntroModal(false)}>
+            <Text style={styles.generateBtnText}>關閉</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
     {showCompleteRelay ? (
       <Animated.View pointerEvents="none" style={[styles.completeOverlay, { opacity: completeOverlayOpacity }]}>
         <View style={styles.completeCard}>
@@ -911,6 +951,28 @@ const styles = StyleSheet.create({
   },
   expHintTitle: { fontSize: 12, fontWeight: "800", color: "#1e40af", marginBottom: 4 },
   expHintItem: { fontSize: 12, color: "#1e3a8a", lineHeight: 18 },
+  resonanceBlock: {
+    backgroundColor: "#fff7ed",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#d56c2f"
+  },
+  resonanceText: { fontSize: 14, color: "#78350f", lineHeight: 22 },
+  infoTriggerBtn: {
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 14
+  },
+  infoTriggerText: { fontSize: 13, color: "#1d4ed8", fontWeight: "700", textAlign: "center" },
+  moduleTaskBlock: { marginBottom: 14 },
+  moduleTaskTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 6 },
+  moduleTaskText: { fontSize: 13, color: "#334155", lineHeight: 20 },
   torchRelayBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -1075,6 +1137,22 @@ const styles = StyleSheet.create({
   shareBtnText: { fontWeight: "700", fontSize: 15 },
   hintText: { fontSize: 12, color: "#9ca3af", textAlign: "center" }
   ,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    padding: 24
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    maxWidth: 400,
+    alignSelf: "center",
+    width: "100%"
+  },
+  modalTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 12 },
+  modalBody: { fontSize: 14, color: "#374151", lineHeight: 22 },
   logBox: {
     marginTop: 16,
     backgroundColor: "#fff",

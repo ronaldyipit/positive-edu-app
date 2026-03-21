@@ -2,9 +2,12 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const nodemailer = require("nodemailer");
 const admin = require("firebase-admin");
 const OpenAI = require("openai");
+const pdfParse = require("pdf-parse");
 
 // ── Firebase Admin（用於伺服器端重設密碼） ──
 if (!admin.apps.length && process.env.FIREBASE_PROJECT_ID) {
@@ -46,6 +49,102 @@ const client = new OpenAI({
   apiKey: poeApiKey,
   baseURL: "https://api.poe.com/v1"
 });
+
+// ── Geelong Positive Education PDF RAG (local retrieval) ───────────────────
+const RAG_PDF_PATH =
+  process.env.RAG_PDF_PATH ||
+  path.join(__dirname, "..", "assets", "RAG", "Positive Education_ The Geelong Grammar School Journey --.pdf");
+const RAG_MAX_CHUNKS = Number(process.env.RAG_MAX_CHUNKS || 3);
+const RAG_CHUNK_SIZE = Number(process.env.RAG_CHUNK_SIZE || 900);
+const RAG_CHUNK_OVERLAP = Number(process.env.RAG_CHUNK_OVERLAP || 180);
+const STOPWORDS = new Set([
+  "the", "and", "for", "that", "this", "with", "from", "have", "your", "you", "are", "not", "but",
+  "what", "when", "where", "will", "into", "about", "can", "how", "they", "their", "our", "was",
+  "were", "been", "is", "a", "to", "of", "in", "on", "at", "it",
+  "係", "嘅", "咗", "同", "及", "與", "並", "而", "就", "都", "又", "很", "在", "是", "有", "把",
+  "the", "an", "or"
+]);
+
+let ragChunks = [];
+let ragLoaded = false;
+
+function normalizeText(s) {
+  return String(s || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function splitIntoChunks(text, size = 900, overlap = 180) {
+  const t = normalizeText(text);
+  if (!t) return [];
+  const out = [];
+  let start = 0;
+  while (start < t.length) {
+    const end = Math.min(t.length, start + size);
+    out.push(t.slice(start, end));
+    if (end >= t.length) break;
+    start = Math.max(0, end - overlap);
+  }
+  return out;
+}
+
+function tokenizeForSearch(text) {
+  return normalizeText(text)
+    .toLowerCase()
+    .split(/[^a-z0-9\u4e00-\u9fff]+/g)
+    .filter((w) => w && w.length >= 2 && !STOPWORDS.has(w));
+}
+
+function scoreChunk(query, chunk) {
+  const qTokens = tokenizeForSearch(query);
+  if (qTokens.length === 0) return 0;
+  const hay = chunk.lower;
+  let score = 0;
+  for (const tok of qTokens) {
+    const idx = hay.indexOf(tok);
+    if (idx >= 0) {
+      score += 2;
+      if (idx < 300) score += 0.5;
+    }
+  }
+  // Soft boost for known positive-education keywords.
+  if (/(perma|wellbeing|well-being|character strength|resilience|gratitude|mindfulness|flow|meaning)/i.test(hay)) score += 0.6;
+  return score;
+}
+
+function buildRagContext(query, maxChunks = 3) {
+  if (!ragLoaded || ragChunks.length === 0 || !query?.trim()) return "";
+  const scored = ragChunks
+    .map((c, i) => ({ i, score: scoreChunk(query, c) }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(1, maxChunks));
+  if (scored.length === 0) return "";
+  const lines = scored.map((x, n) => `[GEELONG_SNIPPET_${n + 1}] ${ragChunks[x.i].text.slice(0, 1200)}`);
+  return lines.join("\n\n");
+}
+
+async function loadRagPdf() {
+  try {
+    if (!fs.existsSync(RAG_PDF_PATH)) {
+      console.warn("[RAG] PDF not found:", RAG_PDF_PATH);
+      ragChunks = [];
+      ragLoaded = false;
+      return;
+    }
+    const buffer = fs.readFileSync(RAG_PDF_PATH);
+    const data = await pdfParse(buffer);
+    const chunks = splitIntoChunks(data?.text || "", RAG_CHUNK_SIZE, RAG_CHUNK_OVERLAP);
+    ragChunks = chunks.map((text) => ({ text, lower: text.toLowerCase() }));
+    ragLoaded = ragChunks.length > 0;
+    console.log(`[RAG] Loaded Geelong PDF chunks: ${ragChunks.length}`);
+  } catch (err) {
+    console.error("[RAG] Failed to load Geelong PDF:", err?.message || err);
+    ragChunks = [];
+    ragLoaded = false;
+  }
+}
+loadRagPdf();
 
 // 根路徑：方便確認 API 已部署（瀏覽器開根網址唔會再顯示 Cannot GET /）
 app.get("/", (req, res) => {
@@ -166,6 +265,9 @@ app.post("/api/coach", async (req, res) => {
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "messages array is required." });
     }
+    const latestUserMsg =
+      [...messages].reverse().find((m) => m?.role === "user" && typeof m?.content === "string")?.content || "";
+    const ragContext = buildRagContext(latestUserMsg, RAG_MAX_CHUNKS);
 
     // 根據學生選擇的 Signature Strengths 動態調整 system prompt
     const strengthsClause =
@@ -191,6 +293,13 @@ app.post("/api/coach", async (req, res) => {
       "\n\n" +
       ZHENG_FA_GUANG_APP_GUIDE +
       "\n\n" +
+      (ragContext
+        ? "GEELONG BOOK CONTEXT (retrieved snippets):\n" +
+          ragContext +
+          "\n\n" +
+          "When relevant, explain and apply the above Geelong Positive Education ideas to the student's situation in simple Traditional Chinese. " +
+          "Do NOT quote long passages; paraphrase and make it practical.\n\n"
+        : "") +
       "If the user hints at self-harm or severe distress, encourage them to seek immediate help from a trusted adult, " +
       "school social worker, or call the Samaritan Befrienders Hong Kong hotline 2389-2222. " +
       "WORRY + SHREDDER LINK: When the user clearly carries worry, rumination, stress, or a problem that cannot be fixed immediately, you may respond in Traditional Chinese (Cantonese-friendly when natural). " +

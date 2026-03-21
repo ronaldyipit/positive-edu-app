@@ -9,13 +9,16 @@ import {
   Easing,
   ScrollView,
   Platform,
-  Vibration
+  Vibration,
+  Modal
 } from "react-native";
 import { Accelerometer } from "expo-sensors";
 import { Audio } from "expo-av";
 import { AppBackground } from "../components/AppBackground";
 
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "https://positive-edu-app.vercel.app";
+const MINDFULNESS_CITATION =
+  "Kabat-Zinn, J. (2003). Mindfulness-based interventions in context: Past, present, and future. Clinical Psychology: Science and Practice, 10(2), 144-156.";
 
 const ENCOURAGEMENTS = [
   "做得好！壓力已被你親手粉碎了 💪",
@@ -35,6 +38,7 @@ const BREATH_PHASES = [
 const SHAKE_THRESHOLD = 1.8; // 搖動強度門檻
 
 export default function SomaticShredderScreen() {
+  const [showMindfulnessModal, setShowMindfulnessModal] = useState(false);
   const [ventText, setVentText] = useState("");
   const [step, setStep] = useState<"write" | "shake" | "shredded" | "breathe" | "done">("write");
   const [shakeProgress, setShakeProgress] = useState(0); // 0–100
@@ -254,9 +258,27 @@ export default function SomaticShredderScreen() {
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <Text style={styles.title}>抒壓碎紙機</Text>
 
-      {/* ── Step 1: 寫下壓力 ── */}
+      {/* ── Step 1: 共鳴 + 靜觀說明 + 模組任務（與離線深潛／正向教練格式一致）── */}
       {step === "write" && (
         <>
+          <View style={styles.resonanceBlock}>
+            <Text style={styles.resonanceText}>
+              成日谂住同一件事，瞓唔着、温唔入脑？{"\n"}
+              有時唔係你唔夠堅強，係個腦同身體需要一個出口。寫低、動一動，再配合靜觀式嘅呼吸，可以幫你同壓力保持少少距離，慢慢鬆一鬆。
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.mindTheoryBox} onPress={() => setShowMindfulnessModal(true)}>
+            <Text style={styles.mindTheoryTitle}>甚麼是靜觀？（按此查看）</Text>
+          </TouchableOpacity>
+
+          <View style={styles.moduleTaskBlock}>
+            <Text style={styles.moduleTaskTitle}>三步抒壓，慢慢鬆一鬆</Text>
+            <Text style={styles.moduleTaskText}>
+              用三步幫你抒壓：先寫低煩惱 → 搖機「碎紙」象徵放手 → 最後做 4‑7‑8 呼吸，用靜觀方式安撫身體。唔使寫得好靚，亦唔會有人睇到你寫咩。
+            </Text>
+          </View>
+
           <Text style={styles.subtitle}>
             把讓你煩惱的事寫出來。{"\n"}
             寫出來本身就是一種釋放。
@@ -420,6 +442,31 @@ export default function SomaticShredderScreen() {
     </ScrollView>
       </View>
     </View>
+
+      <Modal
+        visible={showMindfulnessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMindfulnessModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMindfulnessModal(false)}
+        >
+          <TouchableOpacity style={styles.modalCard} activeOpacity={1} onPress={() => {}}>
+            <Text style={styles.modalTitle}>甚麼是靜觀？</Text>
+            <Text style={styles.modalBody}>
+              靜觀（mindfulness）係有意識地留意「而家此刻」：包括身體感覺、呼吸同腦入面飄過嘅念頭，唔使逼自己「咩都唔諗」。{"\n\n"}
+              重點唔係清空大腦，而係學識覺察、少啲即刻鬧自己；呼吸練習係靜觀入面好常用嘅一種方法，幫身體慢慢由「繃緊」回到較平靜嘅狀態。
+            </Text>
+            <Text style={styles.modalCitation}>出處：{MINDFULNESS_CITATION}</Text>
+            <TouchableOpacity style={[styles.primaryBtn, styles.modalCloseBtn]} onPress={() => setShowMindfulnessModal(false)}>
+              <Text style={styles.primaryBtnText}>關閉</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </AppBackground>
   );
 }
@@ -439,8 +486,48 @@ const styles = StyleSheet.create({
   },
   scroll: { flex: 1 },
   container: { padding: 16, paddingBottom: 40 },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 4, color: "#111827" },
+  title: { fontSize: 22, fontWeight: "700", marginBottom: 12, color: "#111827" },
+  resonanceBlock: {
+    backgroundColor: "#fff7ed",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#d56c2f"
+  },
+  resonanceText: { fontSize: 14, color: "#78350f", lineHeight: 22 },
+  mindTheoryBox: {
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 14
+  },
+  mindTheoryTitle: { fontSize: 13, fontWeight: "700", color: "#1d4ed8", textAlign: "center" },
+  moduleTaskBlock: { marginBottom: 14 },
+  moduleTaskTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 6 },
+  moduleTaskText: { fontSize: 13, color: "#334155", lineHeight: 20 },
   subtitle: { fontSize: 13, color: "#4b5563", marginBottom: 12, lineHeight: 20 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    padding: 24
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    maxWidth: 400,
+    alignSelf: "center",
+    width: "100%"
+  },
+  modalTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 12 },
+  modalBody: { fontSize: 14, color: "#374151", lineHeight: 22 },
+  modalCitation: { fontSize: 11, color: "#64748b", marginTop: 10, fontStyle: "italic", lineHeight: 16 },
+  modalCloseBtn: { marginTop: 16, alignSelf: "stretch" },
   textArea: {
     minHeight: 130,
     borderRadius: 16,
