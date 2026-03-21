@@ -17,8 +17,9 @@ import AICoachScreen from "./src/screens/AICoachScreen";
 import FlowTimerScreen from "./src/screens/FlowTimerScreen";
 import SomaticShredderScreen from "./src/screens/SomaticShredderScreen";
 import GratitudeCardScreen from "./src/screens/GratitudeCardScreen";
+import type { RootTabParamList } from "./src/navigation/types";
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<RootTabParamList>();
 const AuthStack = createNativeStackNavigator();
 
 function AuthNavigator() {
@@ -54,7 +55,11 @@ function MainTabs() {
       <Tab.Screen name="正向教練" component={AICoachScreen} />
       <Tab.Screen name="離線深潛" component={FlowTimerScreen} />
       <Tab.Screen name="抒壓" component={SomaticShredderScreen} />
-      <Tab.Screen name="感恩" component={GratitudeCardScreen} />
+      <Tab.Screen
+        name="感恩"
+        component={GratitudeCardScreen}
+        options={{ tabBarLabel: "火炬傳暖" }}
+      />
       <Tab.Screen name="設定" component={SettingsScreen} />
     </Tab.Navigator>
   );

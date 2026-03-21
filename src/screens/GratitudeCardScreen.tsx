@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,15 +8,45 @@ import {
   ScrollView,
   Alert,
   Platform,
-  Image
+  Image,
+  Animated,
+  Linking
 } from "react-native";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as IntentLauncher from "expo-intent-launcher";
 import { AppBackground } from "../components/AppBackground";
 import * as MediaLibrary from "expo-media-library";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { awardXp } from "../utils/gamification";
 
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "https://positive-edu-app.vercel.app";
+const TASKS_PER_PAGE = 5;
+
+const MODES = [
+  { id: "message", label: "1) 寫感謝訊息" },
+  { id: "repay", label: "2) 默默報答同一個人" },
+  { id: "forward", label: "3) 把善意傳揚開去" }
+] as const;
+type TorchMode = (typeof MODES)[number]["id"];
+type TorchTask = {
+  id: string;
+  mode: TorchMode;
+  title: string;
+  detail: string;
+  recipient?: string;
+  keyword?: string;
+  repayAction?: string;
+  repayWhen?: string;
+  forwardTarget?: string;
+  forwardAction?: string;
+  messageText?: string;
+  createdAt: number;
+  completed: boolean;
+  completedAt?: number;
+  remindedAt?: number;
+};
+const TORCH_TASKS_KEY = "@torch_warm_tasks_v1";
 
 const THEMES = [
   { name: "暖陽", bg: "#fefce8", border: "#fde047", title: "#854d0e", body: "#78350f", accent: "#fbbf24", emoji: "🌻" },
@@ -27,11 +57,11 @@ const THEMES = [
 ];
 
 const RANDOM_PROMPTS = [
-  "今天哪件小事讓你微笑了？",
-  "誰讓你覺得被理解和支持？",
-  "有什麼你平時忽略但其實很感恩的東西？",
-  "最近有誰默默幫過你？",
-  "你感恩自己哪一個特質？"
+  "今天邊個幫你慳咗 10 分鐘？",
+  "最近邊個喺你低潮時撐咗你一下？",
+  "有冇一件小事令你覺得世界其實幾暖？",
+  "如果要回應一次善意，你會做乜？",
+  "若果係陌生人幫咗你，你會點傳落去？"
 ];
 
 const CARD_TEMPLATES = [
@@ -44,8 +74,13 @@ const CARD_TEMPLATES = [
 ];
 
 export default function GratitudeCardScreen() {
+  const [mode, setMode] = useState<TorchMode>("message");
   const [recipient, setRecipient] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [repayAction, setRepayAction] = useState("");
+  const [repayWhen, setRepayWhen] = useState("");
+  const [forwardTarget, setForwardTarget] = useState("");
+  const [forwardAction, setForwardAction] = useState("");
   const [generatedText, setGeneratedText] = useState<string | null>(null);
   const [themeIdx, setThemeIdx] = useState(0);
   const [templateIdx, setTemplateIdx] = useState(0);
@@ -54,17 +89,297 @@ export default function GratitudeCardScreen() {
   const [loadingAi, setLoadingAi] = useState(false);
   const [aiImageUrl, setAiImageUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
+  const [torchTasks, setTorchTasks] = useState<TorchTask[]>([]);
+  const [taskPage, setTaskPage] = useState(1);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
   const viewShotRef = useRef<ViewShot>(null);
+  const leftWobble = useRef(new Animated.Value(0)).current;
+  const flameTravel = useRef(new Animated.Value(0)).current;
+  const rightGlow = useRef(new Animated.Value(0)).current;
+  const transferringRef = useRef(false);
+  const [showCompleteRelay, setShowCompleteRelay] = useState(false);
+  const completeTravel = useRef(new Animated.Value(0)).current;
+  const completeRightGlow = useRef(new Animated.Value(0)).current;
+  const completeOverlayOpacity = useRef(new Animated.Value(0)).current;
+  const completingRef = useRef(false);
   const theme = THEMES[themeIdx];
 
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(leftWobble, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.timing(leftWobble, { toValue: -1, duration: 600, useNativeDriver: true }),
+        Animated.timing(leftWobble, { toValue: 0, duration: 600, useNativeDriver: true })
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [leftWobble]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(TORCH_TASKS_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setTorchTasks(parsed);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem(TORCH_TASKS_KEY, JSON.stringify(torchTasks)).catch(() => {});
+  }, [torchTasks]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(torchTasks.length / TASKS_PER_PAGE));
+    setTaskPage((prev) => Math.min(prev, totalPages));
+  }, [torchTasks.length]);
+
+  useEffect(() => {
+    if (torchTasks.length === 0) return;
+    const now = Date.now();
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+    const dueIds: string[] = [];
+    let dueCount = 0;
+    torchTasks.forEach((t) => {
+      if (!t.completed && !t.remindedAt && now - t.createdAt >= oneWeekMs) {
+        dueIds.push(t.id);
+        dueCount += 1;
+      }
+    });
+    if (dueCount === 0) return;
+    setTorchTasks((prev) =>
+      prev.map((t) => (dueIds.includes(t.id) ? { ...t, remindedAt: now } : t))
+    );
+    Alert.alert("火炬提醒", `你有 ${dueCount} 項火炬任務已超過一星期，記得去「火炬行動簿」確認是否已完成。`);
+  }, [torchTasks]);
+
+  const addTorchTask = (task: Omit<TorchTask, "id" | "createdAt">) => {
+    const next: TorchTask = {
+      ...task,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      createdAt: Date.now()
+    };
+    setTorchTasks((prev) => [next, ...prev]);
+  };
+
+  const markTaskCompleted = (id: string) => {
+    let awarded: TorchTask | null = null;
+    setTorchTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== id || t.completed) return t;
+        awarded = t;
+        return { ...t, completed: true, completedAt: Date.now() };
+      })
+    );
+    if (awarded?.mode === "repay") {
+      awardXp(15).catch(() => {});
+    } else if (awarded?.mode === "forward") {
+      awardXp(30).catch(() => {});
+    }
+    triggerCompleteRelay();
+  };
+
+  const startEditTask = (task: TorchTask) => {
+    if (task.completed) return;
+    setMode(task.mode);
+    setRecipient(task.recipient ?? "");
+    setKeyword(task.keyword ?? "");
+    setRepayAction(task.repayAction ?? "");
+    setRepayWhen(task.repayWhen ?? "");
+    setForwardTarget(task.forwardTarget ?? "");
+    setForwardAction(task.forwardAction ?? "");
+    if (task.mode === "message") setGeneratedText(task.messageText ?? null);
+    setEditingTaskId(task.id);
+  };
+
+  const cancelEditTask = () => {
+    setEditingTaskId(null);
+  };
+
+  const saveMessageTask = () => {
+    const payload = {
+      mode: "message" as const,
+      title: `感謝訊息：${recipient.trim() || "未命名對象"}`,
+      detail: (generatedText?.trim() || `你感謝了對方：${keyword.trim()}`).slice(0, 120),
+      recipient: recipient.trim(),
+      keyword: keyword.trim(),
+      messageText: generatedText?.trim() || CARD_TEMPLATES[templateIdx](recipient.trim(), keyword.trim()),
+      completed: false
+    };
+    if (editingTaskId) {
+      setTorchTasks((prev) => prev.map((t) => (t.id === editingTaskId && !t.completed ? { ...t, ...payload } : t)));
+      Alert.alert("已更新", "感謝訊息任務已更新。");
+      return;
+    }
+    addTorchTask(payload);
+    Alert.alert("已加入火炬行動簿", "感謝訊息任務已新增，你可稍後再發送。");
+  };
+
+  const regenerateMessageTask = (task: TorchTask) => {
+    const r = task.recipient?.trim() || "";
+    const k = task.keyword?.trim() || "";
+    if (!r || !k) {
+      Alert.alert("資料不足", "此任務缺少對象或關鍵字，請先按「編輯」補齊。");
+      return;
+    }
+    const text = CARD_TEMPLATES[templateIdx](r, k);
+    setTorchTasks((prev) =>
+      prev.map((t) =>
+        t.id === task.id && !t.completed
+          ? { ...t, messageText: text, detail: text.slice(0, 120) }
+          : t
+      )
+    );
+    if (editingTaskId === task.id) setGeneratedText(text);
+    Alert.alert("已更新內文", "已為此任務重新生成訊息內容。");
+  };
+
+  const sendMessageTask = async (task: TorchTask) => {
+    const r = task.recipient?.trim() || "";
+    const k = task.keyword?.trim() || "";
+    const text = task.messageText?.trim() || (r && k ? CARD_TEMPLATES[templateIdx](r, k) : "");
+    if (!text) {
+      Alert.alert("未有可發送內容", "請先按「編輯」或「生成內文」。");
+      return;
+    }
+    const encoded = encodeURIComponent(text);
+    const urls = [`whatsapp://send?text=${encoded}`, `https://wa.me/?text=${encoded}`];
+    let opened = false;
+    for (const url of urls) {
+      try {
+        const can = await Linking.canOpenURL(url);
+        if (can) {
+          await Linking.openURL(url);
+          opened = true;
+          break;
+        }
+      } catch {}
+    }
+    if (!opened) {
+      Alert.alert("未能開啟 WhatsApp", "請先安裝 WhatsApp，或稍後再試。");
+      return;
+    }
+    setTorchTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, completed: true, completedAt: Date.now() } : t)));
+    awardXp(20).catch(() => {});
+    triggerCompleteRelay();
+  };
+
+  const triggerTorchRelay = () => {
+    if (transferringRef.current) return;
+    transferringRef.current = true;
+    flameTravel.setValue(0);
+    rightGlow.setValue(0);
+    Animated.sequence([
+      Animated.timing(flameTravel, { toValue: 1, duration: 700, useNativeDriver: true }),
+      Animated.timing(rightGlow, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.delay(380),
+      Animated.timing(rightGlow, { toValue: 0, duration: 450, useNativeDriver: true })
+    ]).start(() => {
+      flameTravel.setValue(0);
+      transferringRef.current = false;
+    });
+  };
+
+  const triggerCompleteRelay = () => {
+    if (completingRef.current) return;
+    completingRef.current = true;
+    setShowCompleteRelay(true);
+    completeTravel.setValue(0);
+    completeRightGlow.setValue(0);
+    completeOverlayOpacity.setValue(0);
+    Animated.sequence([
+      Animated.timing(completeOverlayOpacity, { toValue: 1, duration: 160, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(completeTravel, { toValue: 1, duration: 850, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.delay(550),
+          Animated.timing(completeRightGlow, { toValue: 1, duration: 180, useNativeDriver: true })
+        ])
+      ]),
+      Animated.delay(460),
+      Animated.timing(completeOverlayOpacity, { toValue: 0, duration: 250, useNativeDriver: true })
+    ]).start(() => {
+      completingRef.current = false;
+      setShowCompleteRelay(false);
+      completeTravel.setValue(0);
+      completeRightGlow.setValue(0);
+    });
+  };
+
+  const requiredValid = (() => {
+    if (mode === "message") return !!recipient.trim() && !!keyword.trim();
+    if (mode === "repay") return !!recipient.trim() && !!keyword.trim() && !!repayAction.trim();
+    return !!keyword.trim() && !!forwardAction.trim();
+  })();
+  const totalTaskPages = Math.max(1, Math.ceil(torchTasks.length / TASKS_PER_PAGE));
+  const pageStart = (taskPage - 1) * TASKS_PER_PAGE;
+  const pagedTorchTasks = torchTasks.slice(pageStart, pageStart + TASKS_PER_PAGE);
+
+  useEffect(() => {
+    // 只有「寫感謝訊息」模式需要卡片內容
+    if (mode !== "message") {
+      setGeneratedText(null);
+      setAiImageUrl(null);
+    }
+  }, [mode]);
+
   const handleGenerate = () => {
-    if (!recipient.trim() || !keyword.trim()) return;
-    setGeneratedText(CARD_TEMPLATES[templateIdx](recipient.trim(), keyword.trim()));
+    if (!requiredValid) return;
+    if (mode === "message") {
+      setGeneratedText(CARD_TEMPLATES[templateIdx](recipient.trim(), keyword.trim()));
+      triggerTorchRelay();
+      return;
+    }
+    if (mode === "repay") {
+      const repayPayload = {
+        mode: "repay" as const,
+        title: `默默報答：${recipient.trim()}`,
+        detail: `曾幫你：${keyword.trim()}；你會做：${repayAction.trim()}；時間：${repayWhen.trim() || "本週內"}`,
+        recipient: recipient.trim(),
+        keyword: keyword.trim(),
+        repayAction: repayAction.trim(),
+        repayWhen: repayWhen.trim(),
+        completed: false
+      };
+      if (editingTaskId) {
+        setTorchTasks((prev) =>
+          prev.map((t) => (t.id === editingTaskId && !t.completed ? { ...t, ...repayPayload } : t))
+        );
+        setEditingTaskId(null);
+        Alert.alert("已更新", "火炬任務內容已更新。");
+      } else {
+        addTorchTask(repayPayload);
+        Alert.alert("已加入火炬行動簿", "這項任務已記錄。完成後可在下方手動標記「已完成」。");
+      }
+      triggerTorchRelay();
+      return;
+    }
+    const forwardPayload = {
+      mode: "forward" as const,
+      title: `傳揚開去：${forwardTarget.trim() || "下一位有需要的人"}`,
+      detail: `收到善意：${keyword.trim()}；行動：${forwardAction.trim()}`,
+      keyword: keyword.trim(),
+      forwardTarget: forwardTarget.trim(),
+      forwardAction: forwardAction.trim(),
+      completed: false
+    };
+    if (editingTaskId) {
+      setTorchTasks((prev) =>
+        prev.map((t) => (t.id === editingTaskId && !t.completed ? { ...t, ...forwardPayload } : t))
+      );
+      setEditingTaskId(null);
+      Alert.alert("已更新", "火炬任務內容已更新。");
+    } else {
+      addTorchTask(forwardPayload);
+      Alert.alert("已加入火炬行動簿", "這項任務已記錄。完成後可在下方手動標記「已完成」。");
+    }
+    triggerTorchRelay();
   };
 
   const handleGenerateAi = async () => {
-    if (!recipient.trim() || !keyword.trim()) return;
+    if (mode !== "message" || !recipient.trim() || !keyword.trim()) return;
     setLoadingAi(true);
     try {
       const res = await fetch(`${COACH_API_BASE}/api/gratitude-text`, {
@@ -75,12 +390,15 @@ export default function GratitudeCardScreen() {
       const json = res.ok ? await res.json().catch(() => ({})) : {};
       if (json?.text) {
         setGeneratedText(json.text);
+        triggerTorchRelay();
       } else {
         // API 未實作或失敗時改用本地模板，避免 404 且按鈕仍有作用
         setGeneratedText(CARD_TEMPLATES[templateIdx](recipient.trim(), keyword.trim()));
+        triggerTorchRelay();
       }
     } catch {
       setGeneratedText(CARD_TEMPLATES[templateIdx](recipient.trim(), keyword.trim()));
+      triggerTorchRelay();
     }
     setLoadingAi(false);
   };
@@ -139,10 +457,16 @@ export default function GratitudeCardScreen() {
       }
       const uri = await captureCard();
       if (!uri) throw new Error("截圖失敗");
-      await MediaLibrary.saveToLibraryAsync(uri);
-      Alert.alert("已儲存 📸", "感恩卡已儲存到你的相簿！");
-    } catch {
-      Alert.alert("儲存失敗", "請再試一次。");
+      // 先用 saveToLibrary；若裝置不支援則 fallback 到 createAsset
+      try {
+        await MediaLibrary.saveToLibraryAsync(uri);
+      } catch {
+        const asset = await MediaLibrary.createAssetAsync(uri);
+        await MediaLibrary.createAlbumAsync("正發光", asset, false).catch(() => {});
+      }
+      Alert.alert("已儲存 📸", "火炬傳暖卡已儲存到你的相簿。");
+    } catch (e) {
+      Alert.alert("儲存失敗", "未能儲存到相簿，請檢查相簿權限後再試。");
     } finally {
       setSaving(false);
     }
@@ -182,6 +506,17 @@ export default function GratitudeCardScreen() {
           dialogTitle: "分享感恩卡到 WhatsApp（選擇聯絡人）"
         });
       }
+      if (mode === "message") {
+        addTorchTask({
+          mode: "message",
+          title: `感謝訊息：${recipient.trim() || "未命名對象"}`,
+          detail: generatedText?.slice(0, 120) || `你感謝了對方：${keyword.trim()}`,
+          completed: true,
+          completedAt: Date.now()
+        });
+        awardXp(20).catch(() => {});
+        triggerCompleteRelay();
+      }
     } catch {
       Alert.alert("分享失敗", "請再試一次。");
     } finally {
@@ -194,8 +529,66 @@ export default function GratitudeCardScreen() {
     <View style={styles.outerWrap}>
       <View style={styles.whiteCard}>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-      <Text style={styles.title}>感恩卡製作</Text>
-      <Text style={styles.subtitle}>不好意思當面說「謝謝」？製作一張感恩卡直接傳給對方吧。</Text>
+      <Text style={styles.title}>火炬傳暖</Text>
+      <Text style={styles.subtitle}>唔使長篇，一句都可以傳暖。你可揀：直接答謝、默默回應，或把善意傳落去。</Text>
+      <View style={styles.expHintBox}>
+        <Text style={styles.expHintTitle}>EXP 獎勵</Text>
+        <Text style={styles.expHintItem}>✉️ 寫感謝訊息（成功傳送） +20</Text>
+        <Text style={styles.expHintItem}>🤝 默默報答同一個人（標記完成） +15</Text>
+        <Text style={styles.expHintItem}>🔥 把善意傳揚開去（標記完成） +30</Text>
+      </View>
+      <View style={styles.torchRelayBox}>
+        <Animated.Text
+          style={[
+            styles.torchIcon,
+            { transform: [{ rotate: leftWobble.interpolate({ inputRange: [-1, 1], outputRange: ["-8deg", "8deg"] }) }] }
+          ]}
+        >
+          🔥
+        </Animated.Text>
+        <View style={styles.torchLane}>
+          <Animated.View
+            style={[
+              styles.travelFlame,
+              {
+                opacity: flameTravel.interpolate({ inputRange: [0, 0.05, 0.95, 1], outputRange: [0, 1, 1, 0] }),
+                transform: [{ translateX: flameTravel.interpolate({ inputRange: [0, 1], outputRange: [0, 118] }) }]
+              }
+            ]}
+          >
+            <Text style={styles.travelFlameText}>✨</Text>
+          </Animated.View>
+        </View>
+        <Animated.View style={{ opacity: rightGlow.interpolate({ inputRange: [0, 1], outputRange: [0.65, 1] }) }}>
+          <Text style={styles.torchIcon}>🔥</Text>
+        </Animated.View>
+      </View>
+
+      <View style={styles.modeRow}>
+        {MODES.map((m) => {
+          const active = mode === m.id;
+          return (
+            <TouchableOpacity
+              key={m.id}
+              style={[styles.modeBtn, active && styles.modeBtnActive]}
+              onPress={() => {
+                setMode(m.id);
+                setEditingTaskId(null);
+              }}
+            >
+              <Text style={[styles.modeBtnText, active && styles.modeBtnTextActive]}>{m.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {editingTaskId && mode !== "message" ? (
+        <View style={styles.editingBanner}>
+          <Text style={styles.editingBannerText}>你正在編輯火炬任務</Text>
+          <TouchableOpacity onPress={cancelEditTask}>
+            <Text style={styles.editingCancelText}>取消編輯</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       {/* 靈感提示 */}
       <TouchableOpacity style={styles.promptBox} onPress={handleRandomPrompt}>
@@ -203,20 +596,64 @@ export default function GratitudeCardScreen() {
         <Text style={styles.promptText}>{prompt}</Text>
       </TouchableOpacity>
 
+      {mode !== "forward" && (
+        <TextInput
+          style={styles.input}
+          placeholder={mode === "message" ? "送給誰？（例如：媽媽、同學 Kris）" : "你想默默回應邊個？"}
+          placeholderTextColor="#9ca3af"
+          value={recipient}
+          onChangeText={setRecipient}
+        />
+      )}
       <TextInput
         style={styles.input}
-        placeholder="送給誰？（例如：媽媽、同學 Kris）"
-        placeholderTextColor="#9ca3af"
-        value={recipient}
-        onChangeText={setRecipient}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="感謝他／她什麼？（例如：陪伴、耐心、鼓勵）"
+        placeholder={
+          mode === "message"
+            ? "他／她做咗乜令你想答謝？"
+            : mode === "repay"
+              ? "對方曾經點樣幫過你？"
+              : "你收到過一件咩善意？（例如：陌生人幫你扶門）"
+        }
         placeholderTextColor="#9ca3af"
         value={keyword}
         onChangeText={setKeyword}
       />
+      {mode === "repay" && (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="你打算點樣默默回應？（例如：下次主動幫佢溫書）"
+            placeholderTextColor="#9ca3af"
+            value={repayAction}
+            onChangeText={setRepayAction}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="預計幾時做？（例如：今個星期五）"
+            placeholderTextColor="#9ca3af"
+            value={repayWhen}
+            onChangeText={setRepayWhen}
+          />
+        </>
+      )}
+      {mode === "forward" && (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="你想把善意傳畀邊類人？（例如：同學、陌生人、家人）"
+            placeholderTextColor="#9ca3af"
+            value={forwardTarget}
+            onChangeText={setForwardTarget}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="你打算做咩行動傳揚開去？"
+            placeholderTextColor="#9ca3af"
+            value={forwardAction}
+            onChangeText={setForwardAction}
+          />
+        </>
+      )}
 
       {/* 主題顏色 */}
       <Text style={styles.themeLabel}>卡片主題</Text>
@@ -235,28 +672,41 @@ export default function GratitudeCardScreen() {
 
       <View style={styles.actionRow}>
         <TouchableOpacity
-          style={[styles.generateBtn, (!recipient.trim() || !keyword.trim()) && styles.btnDisabled]}
+          style={[styles.generateBtn, !requiredValid && styles.btnDisabled]}
           onPress={handleGenerate}
-          disabled={!recipient.trim() || !keyword.trim()}
+          disabled={!requiredValid}
         >
-          <Text style={styles.generateBtnText}>📝 模板生成</Text>
+          <Text style={styles.generateBtnText}>
+              {mode === "message" ? "📝 生成內容" : editingTaskId ? "✏️ 更新火炬任務" : "📒 新增到火炬行動簿"}
+          </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.generateBtnAi, (!recipient.trim() || !keyword.trim() || loadingAi) && styles.btnDisabled]}
-          onPress={handleGenerateAi}
-          disabled={!recipient.trim() || !keyword.trim() || loadingAi}
-        >
-          <Text style={styles.generateBtnText}>{loadingAi ? "生成中…" : "✨ AI 生成內文"}</Text>
-        </TouchableOpacity>
-        {generatedText && (
+        {mode === "message" && (
+          <TouchableOpacity
+            style={[styles.switchBtn, !requiredValid && styles.btnDisabled]}
+            onPress={saveMessageTask}
+            disabled={!requiredValid}
+          >
+            <Text style={styles.switchBtnText}>📒 新增到火炬行動簿</Text>
+          </TouchableOpacity>
+        )}
+        {mode === "message" && (
+          <TouchableOpacity
+            style={[styles.generateBtnAi, (!recipient.trim() || !keyword.trim() || loadingAi) && styles.btnDisabled]}
+            onPress={handleGenerateAi}
+            disabled={!recipient.trim() || !keyword.trim() || loadingAi}
+          >
+            <Text style={styles.generateBtnText}>{loadingAi ? "生成中…" : "✨ AI 生成內文"}</Text>
+          </TouchableOpacity>
+        )}
+        {mode === "message" && generatedText && (
           <TouchableOpacity style={styles.switchBtn} onPress={handleSwitchTemplate}>
             <Text style={styles.switchBtnText}>換款式</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* 卡片預覽（ViewShot 截圖範圍） */}
-      {generatedText && (
+      {/* 卡片預覽（只限「寫感謝訊息」模式） */}
+      {mode === "message" && generatedText && (
         <>
           <ViewShot
             ref={viewShotRef}
@@ -290,44 +740,146 @@ export default function GratitudeCardScreen() {
             textAlignVertical="top"
           />
 
-          {/* AI 插圖：無圖時顯示「AI 插圖（選填）」，有圖時顯示「重新生成插圖」 */}
-          <TouchableOpacity
-            style={[styles.generateBtnAi, { marginBottom: 4 }, (!recipient.trim() || !keyword.trim() || loadingImage) && styles.btnDisabled]}
-            onPress={handleGenerateAiImage}
-            disabled={!recipient.trim() || !keyword.trim() || loadingImage}
-          >
-            <Text style={styles.generateBtnText}>
-              {loadingImage ? "生成中…（約需 2–3 分鐘）" : aiImageUrl ? "🖼 重新生成插圖" : "🖼 AI 插圖（選填）"}
-            </Text>
-          </TouchableOpacity>
-          <Text style={styles.imageHint}>⏱ 生成插圖約需 2–3 分鐘，請耐心等候。</Text>
+          {mode === "message" && (
+            <>
+              {/* AI 插圖：無圖時顯示「AI 插圖（選填）」，有圖時顯示「重新生成插圖」 */}
+              <TouchableOpacity
+                style={[styles.generateBtnAi, { marginBottom: 4 }, (!recipient.trim() || !keyword.trim() || loadingImage) && styles.btnDisabled]}
+                onPress={handleGenerateAiImage}
+                disabled={!recipient.trim() || !keyword.trim() || loadingImage}
+              >
+                <Text style={styles.generateBtnText}>
+                  {loadingImage ? "生成中…（約需 2–3 分鐘）" : aiImageUrl ? "🖼 重新生成插圖" : "🖼 AI 插圖（選填）"}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.imageHint}>⏱ 生成插圖約需 2–3 分鐘，請耐心等候。</Text>
+            </>
+          )}
 
           {/* 操作按鈕 */}
-          <View style={styles.saveRow}>
-            <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: theme.accent }, saving && styles.btnDisabled]}
-              onPress={handleSaveToGallery}
-              disabled={saving}
-            >
-              <Text style={styles.saveBtnText}>📸 儲存到相簿</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.shareBtn, { borderColor: theme.accent }, saving && styles.btnDisabled]}
-              onPress={handleShare}
-              disabled={saving}
-            >
-              <Text style={[styles.shareBtnText, { color: theme.title }]}>🔗 分享</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.hintText}>
-            按分享後會開啟 WhatsApp，在 WhatsApp 內選擇聯絡人即可傳送給 {recipient || "對方"}。
-          </Text>
+          {mode === "message" && (
+            <>
+              <View style={styles.saveRow}>
+                <TouchableOpacity
+                  style={[styles.saveBtn, { backgroundColor: theme.accent }, saving && styles.btnDisabled]}
+                  onPress={handleSaveToGallery}
+                  disabled={saving}
+                >
+                  <Text style={styles.saveBtnText}>📸 儲存到相簿</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.shareBtn, { borderColor: theme.accent }, saving && styles.btnDisabled]}
+                  onPress={handleShare}
+                  disabled={saving}
+                >
+                  <Text style={[styles.shareBtnText, { color: theme.title }]}>🔗 傳送訊息並新增到火炬行動簿</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.hintText}>
+                按「傳送訊息並新增到火炬行動簿」後會開啟 WhatsApp，並在行動簿新增一項已完成紀錄。
+              </Text>
+            </>
+          )}
         </>
       )}
+
+      <View style={styles.logBox}>
+        <Text style={styles.logTitle}>📒 火炬行動簿</Text>
+        {torchTasks.length === 0 ? (
+          <Text style={styles.logEmpty}>你未有火炬任務。先完成一個「生成內容」吧。</Text>
+        ) : (
+          pagedTorchTasks.map((t) => (
+            <View key={t.id} style={styles.logItem}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.logItemTitle}>
+                  {t.mode === "message" ? "✉️" : t.mode === "repay" ? "🤝" : "🔥"} {t.title}
+                </Text>
+                <Text style={styles.logItemDetail}>{t.detail}</Text>
+                <View style={styles.logMetaRow}>
+                  <Text style={styles.logItemMeta}>{new Date(t.createdAt).toLocaleDateString("zh-HK")}</Text>
+                  <View style={[styles.statusChip, t.completed ? styles.statusChipDone : styles.statusChipPending]}>
+                    <Text style={[styles.statusChipText, t.completed ? styles.statusChipTextDone : styles.statusChipTextPending]}>
+                      {t.completed ? "已完成" : "待完成"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              {!t.completed ? (
+                t.mode === "message" ? (
+                  <View style={styles.logActionCol}>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => startEditTask(t)}>
+                      <Text style={styles.editBtnText}>編輯</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => regenerateMessageTask(t)}>
+                      <Text style={styles.editBtnText}>生成內文</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.doneBtn} onPress={() => sendMessageTask(t)}>
+                      <Text style={styles.doneBtnText}>發送訊息</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.logActionCol}>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => startEditTask(t)}>
+                      <Text style={styles.editBtnText}>編輯</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.doneBtn} onPress={() => markTaskCompleted(t.id)}>
+                      <Text style={styles.doneBtnText}>標記完成</Text>
+                    </TouchableOpacity>
+                  </View>
+                )
+              ) : null}
+            </View>
+          ))
+        )}
+        {torchTasks.length > TASKS_PER_PAGE ? (
+          <View style={styles.paginationRow}>
+            <TouchableOpacity
+              style={[styles.pageBtn, taskPage === 1 && styles.pageBtnDisabled]}
+              onPress={() => setTaskPage((p) => Math.max(1, p - 1))}
+              disabled={taskPage === 1}
+            >
+              <Text style={styles.pageBtnText}>上一頁</Text>
+            </TouchableOpacity>
+            <Text style={styles.pageInfo}>第 {taskPage} / {totalTaskPages} 頁</Text>
+            <TouchableOpacity
+              style={[styles.pageBtn, taskPage === totalTaskPages && styles.pageBtnDisabled]}
+              onPress={() => setTaskPage((p) => Math.min(totalTaskPages, p + 1))}
+              disabled={taskPage === totalTaskPages}
+            >
+              <Text style={styles.pageBtnText}>下一頁</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+      </View>
     </ScrollView>
       </View>
     </View>
+    {showCompleteRelay ? (
+      <Animated.View pointerEvents="none" style={[styles.completeOverlay, { opacity: completeOverlayOpacity }]}>
+        <View style={styles.completeCard}>
+          <Text style={styles.completeTitle}>任務完成</Text>
+          <View style={styles.completeTorchRow}>
+            <Text style={styles.completeTorch}>🔥</Text>
+            <View style={styles.completeLane}>
+              <Animated.View
+                style={[
+                  styles.completeTravelFlame,
+                  {
+                    opacity: completeTravel.interpolate({ inputRange: [0, 0.06, 0.95, 1], outputRange: [0, 1, 1, 0] }),
+                    transform: [{ translateX: completeTravel.interpolate({ inputRange: [0, 1], outputRange: [0, 172] }) }]
+                  }
+                ]}
+              >
+                <Text style={styles.completeTravelFlameText}>✨</Text>
+              </Animated.View>
+            </View>
+            <Animated.View style={{ opacity: completeRightGlow.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }}>
+              <Text style={styles.completeTorch}>🔥</Text>
+            </Animated.View>
+          </View>
+        </View>
+      </Animated.View>
+    ) : null}
     </AppBackground>
   );
 }
@@ -349,6 +901,64 @@ const styles = StyleSheet.create({
   container: { padding: 16, paddingBottom: 40 },
   title: { fontSize: 22, fontWeight: "700", marginBottom: 4, color: "#111827" },
   subtitle: { fontSize: 13, color: "#4b5563", marginBottom: 14 },
+  expHintBox: {
+    backgroundColor: "#eff6ff",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10
+  },
+  expHintTitle: { fontSize: 12, fontWeight: "800", color: "#1e40af", marginBottom: 4 },
+  expHintItem: { fontSize: 12, color: "#1e3a8a", lineHeight: 18 },
+  torchRelayBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14
+  },
+  torchIcon: { fontSize: 28 },
+  torchLane: {
+    width: 128,
+    height: 16,
+    borderRadius: 999,
+    backgroundColor: "#fff7ed",
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+    marginHorizontal: 10,
+    justifyContent: "center"
+  },
+  travelFlame: { position: "absolute", left: 2 },
+  travelFlameText: { fontSize: 14 },
+  modeRow: { gap: 8, marginBottom: 12 },
+  modeBtn: {
+    borderWidth: 1.5,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  modeBtnActive: {
+    borderColor: "#d56c2f",
+    backgroundColor: "#fff7ed"
+  },
+  modeBtnText: { fontSize: 13, color: "#4b5563", fontWeight: "600" },
+  modeBtnTextActive: { color: "#b45309" },
+  editingBanner: {
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+    backgroundColor: "#fff7ed",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  editingBannerText: { fontSize: 12, color: "#9a3412", fontWeight: "700" },
+  editingCancelText: { fontSize: 12, color: "#b45309", fontWeight: "700" },
   promptBox: {
     backgroundColor: "#fffbeb",
     borderRadius: 12,
@@ -464,4 +1074,110 @@ const styles = StyleSheet.create({
   },
   shareBtnText: { fontWeight: "700", fontSize: 15 },
   hintText: { fontSize: 12, color: "#9ca3af", textAlign: "center" }
+  ,
+  logBox: {
+    marginTop: 16,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 14,
+    padding: 12
+  },
+  logTitle: { fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 8 },
+  logEmpty: { fontSize: 13, color: "#6b7280" },
+  logItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#f3f4f6",
+    paddingTop: 10,
+    marginTop: 10
+  },
+  logItemTitle: { fontSize: 13, fontWeight: "700", color: "#1f2937", marginBottom: 3 },
+  logItemDetail: { fontSize: 12, color: "#4b5563", lineHeight: 18 },
+  logMetaRow: { flexDirection: "row", alignItems: "center", marginTop: 6, gap: 8 },
+  logItemMeta: { fontSize: 11, color: "#9ca3af" },
+  paginationRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  pageBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "#fff7ed",
+    borderWidth: 1,
+    borderColor: "#fed7aa"
+  },
+  pageBtnDisabled: { opacity: 0.45 },
+  pageBtnText: { fontSize: 12, fontWeight: "700", color: "#9a3412" },
+  pageInfo: { fontSize: 12, color: "#6b7280", fontWeight: "600" },
+  logActionCol: { marginLeft: 10, gap: 8 },
+  editBtn: {
+    backgroundColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999
+  },
+  editBtnText: { fontSize: 12, color: "#1d4ed8", fontWeight: "800" },
+  statusChip: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1
+  },
+  statusChipPending: { backgroundColor: "#fff7ed", borderColor: "#fdba74" },
+  statusChipDone: { backgroundColor: "#ecfdf5", borderColor: "#86efac" },
+  statusChipText: { fontSize: 11, fontWeight: "700" },
+  statusChipTextPending: { color: "#9a3412" },
+  statusChipTextDone: { color: "#166534" },
+  doneBtn: {
+    backgroundColor: "#2563eb",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999
+  },
+  doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  completeOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(17,24,39,0.42)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18
+  },
+  completeCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: "#fed7aa",
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    alignItems: "center"
+  },
+  completeTitle: { fontSize: 22, fontWeight: "800", color: "#9a3412", marginBottom: 14 },
+  completeTorchRow: { flexDirection: "row", alignItems: "center" },
+  completeTorch: { fontSize: 56 },
+  completeLane: {
+    width: 190,
+    height: 22,
+    borderRadius: 999,
+    backgroundColor: "#fff7ed",
+    borderWidth: 1,
+    borderColor: "#fed7aa",
+    marginHorizontal: 12,
+    justifyContent: "center"
+  },
+  completeTravelFlame: { position: "absolute", left: 2 },
+  completeTravelFlameText: { fontSize: 22 }
 });

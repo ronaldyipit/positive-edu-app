@@ -10,20 +10,24 @@ import {
   Linking,
   StatusBar,
   Modal,
-  Dimensions,
-  Platform
+  Platform,
+  ActivityIndicator
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import * as Clipboard from "expo-clipboard";
+import { useNavigation } from "@react-navigation/native";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import type { RootTabParamList } from "../navigation/types";
 import { AppBackground } from "../components/AppBackground";
-import { FlowAbstractArt } from "../components/FlowAbstractArt";
-import { useAuth } from "../contexts/AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { awardXp } from "../utils/gamification";
 
 const STORAGE_KEY = "@flow_timer_data";
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "https://positive-edu-app.vercel.app";
+const FLOW_REFERENCE =
+  "Csikzentimihalyi, M. (1975). Beyond boredom and anxiety: Experiencing flow in work and play. San Francisco/Washington/London.";
 
 const MIN_DURATION_MINUTES = 5;
 
@@ -34,32 +38,6 @@ const DURATIONS = [
   { label: "45 分", minutes: 45 },
   { label: "60 分", minutes: 60 }
 ];
-
-// RPG 稱號：根據累計完成次數
-const RPG_TITLES = [
-  { threshold: 0,  icon: "🌱", title: "初心學者",   color: "#16a34a" },
-  { threshold: 3,  icon: "🔥", title: "燃燒鬥士",   color: "#ea580c" },
-  { threshold: 5,  icon: "⚡", title: "心流俠客",   color: "#7c3aed" },
-  { threshold: 10, icon: "🏆", title: "專注大師",   color: "#b45309" },
-  { threshold: 20, icon: "💎", title: "傳奇學者",   color: "#0369a1" },
-  { threshold: 40, icon: "👑", title: "至尊智者",   color: "#be185d" }
-];
-
-const BADGES = [
-  { threshold: 1,  icon: "🌱", name: "第一步" },
-  { threshold: 3,  icon: "🔥", name: "燃燒中" },
-  { threshold: 5,  icon: "⚡", name: "心流達人" },
-  { threshold: 10, icon: "🏆", name: "專注大師" },
-  { threshold: 20, icon: "💎", name: "傳奇學者" }
-];
-
-function getRpgTitle(sessions: number) {
-  let result = RPG_TITLES[0];
-  for (const t of RPG_TITLES) {
-    if (sessions >= t.threshold) result = t;
-  }
-  return result;
-}
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60).toString().padStart(2, "0");
@@ -91,7 +69,10 @@ function toWhatsAppPhone(raw: string): string | null {
 }
 
 export default function FlowTimerScreen() {
-  const { user } = useAuth();
+  const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
+  const insets = useSafeAreaInsets();
+  /** 底部略留空即可（Tab 內容區已在上方面板，毋須過大留白） */
+  const scrollBottomPad = 12 + Math.min(insets.bottom, 20) + 20;
   const [selectedIdx, setSelectedIdx] = useState(2);
   const [customMinutesInput, setCustomMinutesInput] = useState("");
   const [taskName, setTaskName] = useState("");
@@ -106,8 +87,6 @@ export default function FlowTimerScreen() {
   const totalSeconds = effectiveMinutes * 60;
   const [remaining, setRemaining] = useState(totalSeconds);
   const [running, setRunning] = useState(false);
-  const [xp, setXp] = useState(0);
-  const [completedSessions, setCompletedSessions] = useState(0);
   const [celebrateAnim] = useState(new Animated.Value(0));
   const [showCelebrate, setShowCelebrate] = useState(false);
   const [celebrateTask, setCelebrateTask] = useState("");
@@ -119,13 +98,12 @@ export default function FlowTimerScreen() {
   const [showTimeGuessModal, setShowTimeGuessModal] = useState(false);
   const [feltMinutes, setFeltMinutes] = useState<number | null>(null);
   const [showRevealModal, setShowRevealModal] = useState(false);
-  const [flowTimeFeedbackMessage, setFlowTimeFeedbackMessage] = useState<string | null>(null);
-  const [flowTimeFeedbackLoading, setFlowTimeFeedbackLoading] = useState(false);
-  const [showArtModal, setShowArtModal] = useState(false);
+  const [showFlowIntroModal, setShowFlowIntroModal] = useState(false);
   const [actualMinutesForReveal, setActualMinutesForReveal] = useState(0);
   const [sessionEndTaskName, setSessionEndTaskName] = useState("");
-  const [sessionEndDifficulty, setSessionEndDifficulty] = useState<string | null>(null);
-  const [sessionEndId, setSessionEndId] = useState("");
+  /** 心流時差藍色一句：一律 AI 生成 */
+  const [flowRevealAiMessage, setFlowRevealAiMessage] = useState<string | null>(null);
+  const [flowRevealAiLoading, setFlowRevealAiLoading] = useState(false);
   const [safetyContact, setSafetyContact] = useState("");
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [showConfirmAfterWhatsApp, setShowConfirmAfterWhatsApp] = useState(false);
@@ -141,8 +119,6 @@ export default function FlowTimerScreen() {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const data = JSON.parse(raw);
-        if (typeof data.xp === "number") setXp(data.xp);
-        if (typeof data.completedSessions === "number") setCompletedSessions(data.completedSessions);
         if (Array.isArray(data.sessionLog)) setSessionLog(data.sessionLog.slice(0, 10));
       } catch {}
     })();
@@ -155,17 +131,13 @@ export default function FlowTimerScreen() {
     if (!hasLoadedRef.current) return;
     AsyncStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ xp, completedSessions, sessionLog: sessionLog.slice(0, 10) })
+      JSON.stringify({ sessionLog: sessionLog.slice(0, 10) })
     ).catch(() => {});
-  }, [xp, completedSessions, sessionLog]);
+  }, [sessionLog]);
 
   const progress = 1 - remaining / totalSeconds;
   const displayProgress = running ? Math.pow(progress, 0.85) : progress;
   const strokeDashoffset = CIRCUMFERENCE * (1 - displayProgress);
-  const rpg = getRpgTitle(completedSessions);
-  const level = Math.floor(xp / 100) + 1;
-  const progressToNext = xp % 100;
-
   const handleSelectDuration = (idx: number) => {
     if (running) return;
     setSelectedIdx(idx);
@@ -205,18 +177,15 @@ export default function FlowTimerScreen() {
           clearInterval(id);
           setRunning(false);
           const minutes = Math.round(totalSeconds / 60);
-          const earned = minutes * 2;
           const task = taskName.trim() || "自由學習";
-          setXp((x) => x + earned);
-          setCompletedSessions((c) => c + 1);
           setCelebrateTask(task);
           setSessionLog((log) => [{ task, minutes }, ...log].slice(0, 10));
           setActualMinutesForReveal(minutes);
           setSessionEndTaskName(task);
-          setSessionEndDifficulty(difficulty);
-          setSessionEndId(Date.now().toString());
           setShowTimeGuessModal(true);
           setFeltMinutes(null);
+          // 只有完整完成（非提早結束）才計入共用 Gamification XP
+          awardXp(20).catch(() => {});
           fetch(`${COACH_API_BASE}/api/timer-reflection`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -233,11 +202,10 @@ export default function FlowTimerScreen() {
     return () => clearInterval(id);
   }, [running, taskName, totalSeconds, difficulty]);
 
-  // 心流時差：開啟對比驚喜時向後端取得 AI 回饋
   useEffect(() => {
     if (!showRevealModal || feltMinutes === null) return;
-    setFlowTimeFeedbackMessage(null);
-    setFlowTimeFeedbackLoading(true);
+    setFlowRevealAiLoading(true);
+    setFlowRevealAiMessage(null);
     fetch(`${COACH_API_BASE}/api/flow-time-feedback`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -248,10 +216,18 @@ export default function FlowTimerScreen() {
       })
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((j) => j?.message && setFlowTimeFeedbackMessage(j.message))
+      .then((j) => {
+        if (j?.message && typeof j.message === "string") setFlowRevealAiMessage(j.message.trim());
+      })
       .catch(() => {})
-      .finally(() => setFlowTimeFeedbackLoading(false));
+      .finally(() => setFlowRevealAiLoading(false));
   }, [showRevealModal, feltMinutes, actualMinutesForReveal, sessionEndTaskName]);
+
+  const buildFlowCoachPrefill = () => {
+    const task = sessionEndTaskName.trim() || "自由學習";
+    const felt = feltMinutes ?? 0;
+    return `我啱啱完成離線深潛：任務係「${task}」，實際專注咗 ${actualMinutesForReveal} 分鐘，但我覺得只係過咗 ${felt} 分鐘。想同你傾下呢段體驗同心得。`;
+  };
 
   const handleStart = () => {
     if (running) {
@@ -272,8 +248,6 @@ export default function FlowTimerScreen() {
     setRemaining(totalSeconds);
   };
 
-  const earnedBadges = BADGES.filter((b) => completedSessions >= b.threshold);
-  const nextBadge = BADGES.find((b) => completedSessions < b.threshold);
   const ringColor = running ? "#d56c2f" : remaining === totalSeconds ? "#e5e7eb" : "#f97316";
   const durationCounts = sessionLog.reduce((acc, s) => {
     acc[s.minutes] = (acc[s.minutes] || 0) + 1;
@@ -283,8 +257,6 @@ export default function FlowTimerScreen() {
     sessionLog.length >= 2 ? Number(Object.entries(durationCounts).sort((a, b) => b[1] - a[1])[0]?.[0]) : null;
   const recommendedIdx = recommendedMinutes != null ? DURATIONS.findIndex((d) => d.minutes === recommendedMinutes) : -1;
 
-  const displayName = user?.displayName?.trim() || "我";
-  const craftMessage = `【${displayName}】正在進入「深潛心流」，預計在另一個維度待一陣子。請稍後再聯繫。`;
   const minutesForSession = effectiveMinutes;
   const safetySmsBody = `我現在進入 ${minutesForSession} 分鐘的「深潛心流」模式，手機將會斷網。結束後我會立刻回覆你。不用擔心！`;
 
@@ -344,8 +316,6 @@ export default function FlowTimerScreen() {
     const task = taskName.trim() || "自由學習";
     setActualMinutesForReveal(actualMinutes);
     setSessionEndTaskName(task);
-    setSessionEndDifficulty(difficulty);
-    setSessionEndId(Date.now().toString());
     setShowTimeGuessModal(true);
     setFeltMinutes(null);
     setRemaining(totalSeconds);
@@ -387,25 +357,39 @@ export default function FlowTimerScreen() {
       ) : (
       <View style={styles.outerWrap}>
       <View style={styles.whiteCard}>
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={[styles.container, { paddingBottom: scrollBottomPad }]}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator
+      nestedScrollEnabled
+    >
       <Text style={styles.title}>離線深潛</Text>
-      <View style={styles.flowTheoryBox}>
-        <Text style={styles.flowTheoryTitle}>什麼是心流？</Text>
-        <Text style={styles.flowTheoryText}>
-          心流（flow）不是單純「專注」，而是全神貫注、行動與意識合一的最佳體驗狀態。心理學家 Csíkszentmihályi 指出：當<Text style={styles.flowTheoryBold}> 挑戰與技能平衡 </Text>、有<Text style={styles.flowTheoryBold}> 清晰目標 </Text>與<Text style={styles.flowTheoryBold}> 即時回饋 </Text>時，較容易進入心流——沉浸、忘我、內在獎勵。計時只是輔助；先選一項對你有適當難度的任務，再開始。
+      <View style={styles.expHintBox}>
+        <Text style={styles.expHintTitle}>EXP 獎勵</Text>
+        <Text style={styles.expHintItem}>🌊 完整完成離線深潛（無提早結束） +20</Text>
+      </View>
+      <View style={styles.resonanceBlock}>
+        <Text style={styles.resonanceText}>
+          測驗、功課、補習、比較……成日個腦停唔到？{"\n"}
+          呢度唔係叫你「努力啲」，而係俾你一段時間，進入心流，專注做好一件事，慢慢搵返你自己嘅節奏。
         </Text>
-        <TouchableOpacity onPress={() => Linking.openURL("https://en.wikipedia.org/wiki/Flow_(psychology)")}>
-          <Text style={styles.flowTheoryLink}>參考：Flow (psychology) · Wikipedia</Text>
-        </TouchableOpacity>
       </View>
 
-      {/* RPG 稱號 */}
-      <View style={[styles.rpgBanner, { borderColor: rpg.color }]}>
-        <Text style={styles.rpgIcon}>{rpg.icon}</Text>
-        <View>
-          <Text style={[styles.rpgTitle, { color: rpg.color }]}>{rpg.title}</Text>
-          <Text style={styles.rpgSub}>等級 {level} · {xp} XP · 完成 {completedSessions} 次</Text>
-        </View>
+      <TouchableOpacity style={styles.flowTheoryBox} onPress={() => setShowFlowIntroModal(true)}>
+        <Text style={styles.flowTheoryTitle}>什麼是心流？（按此查看）</Text>
+      </TouchableOpacity>
+
+      <View style={styles.moduleTaskBlock}>
+        <Text style={styles.moduleTaskTitle}>你都做得到！</Text>
+        <Text style={styles.moduleTaskText}>
+          今次目標係幫你進入心流狀態，專注完成一件事。{"\n\n"}
+          1) 揀一個任務，再調到「有挑戰但做得到」：太易會悶，太難會焦慮{"\n"}
+          2) 設一個清晰小目標：例如「做完第 1–3 題」或「背完 10 個詞」{"\n"}
+          3) 設定時間，手動關閉通知／Wi‑Fi，畀自己真係「離線」只做一件事{"\n"}
+          4) 用即時回饋推住自己：做卷就對答案／計分；溫書就每 5–10 分鐘自測一次{"\n"}
+          5) 完成後做個小回顧：你覺得過咗幾耐？時間感會話你知你有幾沉浸
+        </Text>
       </View>
 
       {/* 任務命名 */}
@@ -453,18 +437,36 @@ export default function FlowTimerScreen() {
         </View>
       )}
 
-      {/* 時長選擇 */}
-      <View style={styles.durationRow}>
-        {DURATIONS.map((d, i) => (
-          <TouchableOpacity
-            key={d.minutes}
-            style={[styles.durationBtn, selectedIdx === i && styles.durationBtnActive, running && styles.durationBtnDisabled]}
-            onPress={() => handleSelectDuration(i)}
-            disabled={running}
-          >
-            <Text style={[styles.durationText, selectedIdx === i && styles.durationTextActive]}>{d.label}</Text>
-          </TouchableOpacity>
-        ))}
+      {/* 時長選擇（與任務區隔開；45／60 分同一行） */}
+      <View style={styles.durationSection}>
+        <Text style={styles.durationSectionLabel}>選擇時長</Text>
+        <View style={styles.durationRow}>
+          {DURATIONS.slice(0, 3).map((d, i) => (
+            <TouchableOpacity
+              key={d.minutes}
+              style={[styles.durationBtn, selectedIdx === i && styles.durationBtnActive, running && styles.durationBtnDisabled]}
+              onPress={() => handleSelectDuration(i)}
+              disabled={running}
+            >
+              <Text style={[styles.durationText, selectedIdx === i && styles.durationTextActive]}>{d.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={styles.durationRowLast}>
+          {DURATIONS.slice(3, 5).map((d, j) => {
+            const i = j + 3;
+            return (
+              <TouchableOpacity
+                key={d.minutes}
+                style={[styles.durationBtn, selectedIdx === i && styles.durationBtnActive, running && styles.durationBtnDisabled]}
+                onPress={() => handleSelectDuration(i)}
+                disabled={running}
+              >
+                <Text style={[styles.durationText, selectedIdx === i && styles.durationTextActive]}>{d.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
       <View style={styles.customDurationRow}>
         <Text style={styles.customDurationLabel}>自訂：</Text>
@@ -473,7 +475,7 @@ export default function FlowTimerScreen() {
           value={customMinutesInput}
           onChangeText={handleCustomMinutesChange}
           onFocus={() => !running && setSelectedIdx(-1)}
-          placeholder="分鐘（至少 5）"
+          placeholder="≥5"
           placeholderTextColor="#9ca3af"
           keyboardType="number-pad"
           maxLength={3}
@@ -514,7 +516,6 @@ export default function FlowTimerScreen() {
           <Text style={styles.celebrateText}>
             🎉 完成！{celebrateTask ? `「${celebrateTask}」` : ""}
           </Text>
-          <Text style={styles.celebrateXp}>+{effectiveMinutes * 2} XP 已獲得</Text>
           {aiReflection ? <Text style={styles.celebrateAi}>💬 {aiReflection}</Text> : null}
         </Animated.View>
       )}
@@ -528,36 +529,6 @@ export default function FlowTimerScreen() {
           <Text style={styles.buttonText}>↩ 重設</Text>
         </TouchableOpacity>
       </View>
-
-      {/* XP 進度條 */}
-      <View style={styles.statsBox}>
-        <View style={styles.statsHeader}>
-          <Text style={styles.statsTitle}>等級 {level}</Text>
-          <Text style={styles.xpText}>{xp} XP</Text>
-        </View>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${progressToNext}%` }]} />
-        </View>
-        <Text style={styles.statsSubtext}>下一等級還需 {100 - progressToNext} XP</Text>
-        {nextBadge && (
-          <Text style={styles.nextBadge}>下一個徽章：{nextBadge.icon} {nextBadge.name}（完成 {nextBadge.threshold} 次）</Text>
-        )}
-      </View>
-
-      {/* 徽章 */}
-      {earnedBadges.length > 0 && (
-        <View style={styles.badgeBox}>
-          <Text style={styles.badgeTitle}>已獲得的徽章</Text>
-          <View style={styles.badgeRow}>
-            {earnedBadges.map((b) => (
-              <View key={b.name} style={styles.badgeItem}>
-                <Text style={styles.badgeIcon}>{b.icon}</Text>
-                <Text style={styles.badgeName}>{b.name}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
 
       {/* 最近完成記錄 */}
       {sessionLog.length > 0 && (
@@ -633,7 +604,7 @@ export default function FlowTimerScreen() {
           </View>
         </View>
       </Modal>
-      {/* 對比驚喜：偷走了 X 分鐘 */}
+      {/* 心流時差 → 可轉去正向教練繼續傾 */}
       <Modal visible={showRevealModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -642,49 +613,53 @@ export default function FlowTimerScreen() {
               <>
                 <Text style={styles.revealText}>你覺得：{feltMinutes} 分鐘</Text>
                 <Text style={styles.revealText}>實際：{actualMinutesForReveal} 分鐘</Text>
-                <Text style={styles.revealMessage}>
-                  {flowTimeFeedbackLoading
-                    ? "正在根據你的心流時差生成回饋…"
-                    : flowTimeFeedbackMessage
-                      ? flowTimeFeedbackMessage
-                      : actualMinutesForReveal > feltMinutes
-                        ? `哇！剛才你進入了深層心流。你偷走了 ${actualMinutesForReveal - feltMinutes} 分鐘的焦慮，並把它轉化成了純粹的創造力。這就是你的「超能力狀態」。`
-                        : actualMinutesForReveal < feltMinutes
-                          ? "時間感很準！你專注在當下，心流讓這段時間過得充實。"
-                          : "你與時間同步，心流讓這段體驗剛剛好。"}
+                <View style={styles.revealHintWrap}>
+                  {flowRevealAiLoading ? (
+                    <View style={styles.revealAiLoadingRow}>
+                      <ActivityIndicator color="#2563eb" size="small" />
+                      <Text style={styles.revealHintMuted}>正在為你生成回饋…</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.revealHint}>
+                      {flowRevealAiMessage ||
+                        (actualMinutesForReveal > feltMinutes
+                          ? "專注時時間好似過得特別快，好常見㗎。"
+                          : actualMinutesForReveal < feltMinutes
+                            ? "你覺得過咗好耐，代表你有投入喺件事上面。"
+                            : "節奏啱啱好，呢段深潛好穩陣。")}
+                    </Text>
+                  )}
+                </View>
+                <Text style={styles.revealCoachHint}>
+                  想同 AI 教練傾多兩句？會幫你預填今次任務、時長同時間感，你按送出就可以開傾。
                 </Text>
-                <TouchableOpacity style={[styles.button, styles.buttonStart]} onPress={() => { setShowRevealModal(false); setShowArtModal(true); }}>
-                  <Text style={styles.buttonText}>看我的心流畫作</Text>
+                <TouchableOpacity
+                  style={[styles.button, styles.buttonStart, { marginBottom: 10 }]}
+                  onPress={() => {
+                    setShowRevealModal(false);
+                    navigation.navigate("正向教練", { coachPrefillFromFlow: buildFlowCoachPrefill() });
+                  }}
+                >
+                  <Text style={styles.buttonText}>同教練講剛才嘅深潛</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.button, styles.buttonSecondary]} onPress={() => setShowRevealModal(false)}>
+                  <Text style={styles.buttonText}>完成</Text>
                 </TouchableOpacity>
               </>
             )}
           </View>
         </View>
       </Modal>
-      {/* 獨一無二抽象畫 + 深潛心流訊息 */}
-      <Modal visible={showArtModal} transparent animationType="fade">
+      <Modal visible={showFlowIntroModal} transparent animationType="fade" onRequestClose={() => setShowFlowIntroModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.artModalCard}>
-            <Text style={styles.artModalTitle}>屬於你這次心流的獨一無二</Text>
-            <View style={styles.artWrap}>
-              <FlowAbstractArt
-                taskName={sessionEndTaskName}
-                minutes={actualMinutesForReveal}
-                difficulty={sessionEndDifficulty}
-                sessionId={sessionEndId}
-                width={Dimensions.get("window").width - 48}
-                height={220}
-              />
-            </View>
-            <TouchableOpacity
-              style={styles.copyCraftBtn}
-              onPress={() => Clipboard.setStringAsync(craftMessage).then(() => {})}
-            >
-              <Text style={styles.copyCraftBtnText}>📋 複製深潛心流訊息</Text>
-            </TouchableOpacity>
-            <Text style={styles.craftPreview} numberOfLines={2}>{craftMessage}</Text>
-            <TouchableOpacity style={[styles.button, styles.buttonSecondary]} onPress={() => setShowArtModal(false)}>
-              <Text style={styles.buttonText}>完成</Text>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>什麼是心流？</Text>
+            <Text style={styles.flowTheoryText}>
+              心流（flow）不是單純「專注」，而是全神貫注、行動與意識合一的最佳體驗狀態。心理學家 Csíkszentmihályi 指出：當<Text style={styles.flowTheoryBold}> 挑戰與技能平衡 </Text>、有<Text style={styles.flowTheoryBold}> 清晰目標 </Text>與<Text style={styles.flowTheoryBold}> 即時回饋 </Text>時，較容易進入心流——沉浸、忘我、內在獎勵。計時只是輔助；先選一項對你有適當難度的任務，再開始。
+            </Text>
+            <Text style={styles.flowTheoryLink}>出處：{FLOW_REFERENCE}</Text>
+            <TouchableOpacity style={[styles.button, styles.buttonSecondary, { marginTop: 14 }]} onPress={() => setShowFlowIntroModal(false)}>
+              <Text style={styles.buttonText}>關閉</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -711,21 +686,44 @@ const styles = StyleSheet.create({
     elevation: 3
   },
   scroll: { flex: 1 },
-  container: { padding: 16, paddingBottom: 40 },
+  container: { padding: 16 },
   title: { fontSize: 22, fontWeight: "700", marginBottom: 12, color: "#111827" },
+  expHintBox: {
+    backgroundColor: "#eff6ff",
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10
+  },
+  expHintTitle: { fontSize: 12, fontWeight: "800", color: "#1e40af", marginBottom: 4 },
+  expHintItem: { fontSize: 12, color: "#1e3a8a", lineHeight: 18 },
+  resonanceBlock: {
+    backgroundColor: "#fff7ed",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#d56c2f"
+  },
+  resonanceText: { fontSize: 14, color: "#78350f", lineHeight: 22 },
+  moduleTaskBlock: { marginBottom: 14 },
+  moduleTaskTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 6 },
+  moduleTaskText: { fontSize: 13, color: "#334155", lineHeight: 20 },
   // Flow theory
   flowTheoryBox: {
     backgroundColor: "#eff6ff",
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: "#bfdbfe"
   },
-  flowTheoryTitle: { fontSize: 14, fontWeight: "700", color: "#1e40af", marginBottom: 6 },
+  flowTheoryTitle: { fontSize: 13, fontWeight: "700", color: "#1d4ed8", textAlign: "center" },
   flowTheoryText: { fontSize: 13, color: "#374151", lineHeight: 20 },
   flowTheoryBold: { fontWeight: "700", color: "#1e40af" },
-  flowTheoryLink: { fontSize: 11, color: "#2563eb", marginTop: 8, textDecorationLine: "underline" },
+  flowTheoryLink: { fontSize: 11, color: "#64748b", marginTop: 8, fontStyle: "italic", lineHeight: 16 },
   // RPG Banner
   rpgBanner: {
     flexDirection: "row",
@@ -773,11 +771,41 @@ const styles = StyleSheet.create({
   difficultyBtnText: { fontSize: 13, color: "#6b7280", fontWeight: "600" },
   difficultyBtnTextActive: { color: "#2563eb" },
   difficultyHint: { fontSize: 11, color: "#2563eb", marginTop: 6 },
-  // Duration
-  durationRow: { flexDirection: "row", justifyContent: "center", marginBottom: 12, gap: 8 },
+  durationSection: {
+    marginTop: 22,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb"
+  },
+  durationSectionLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: 12,
+    textAlign: "center"
+  },
+  durationRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+    gap: 8
+  },
+  durationRowLast: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 8
+  },
   durationBtn: {
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: 999, borderWidth: 1.5, borderColor: "#d1d5db", backgroundColor: "#fff"
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: "#d1d5db",
+    backgroundColor: "#fff"
   },
   durationBtnActive: { borderColor: "#d56c2f", backgroundColor: "#fff7ed" },
   durationBtnDisabled: { opacity: 0.4 },
@@ -868,13 +896,11 @@ const styles = StyleSheet.create({
   timeGuessBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, backgroundColor: "#eff6ff", borderWidth: 1.5, borderColor: "#bfdbfe" },
   timeGuessBtnText: { fontSize: 15, fontWeight: "600", color: "#2563eb" },
   revealText: { fontSize: 15, color: "#374151", marginBottom: 4 },
-  revealMessage: { fontSize: 15, color: "#1e40af", fontWeight: "600", marginVertical: 16, lineHeight: 22 },
-  artModalCard: { backgroundColor: "#fff", borderRadius: 20, padding: 24, width: "100%", maxWidth: 360, alignItems: "center" },
-  artModalTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 16 },
-  artWrap: { marginBottom: 16, borderRadius: 20, overflow: "hidden" },
-  copyCraftBtn: { paddingVertical: 12, paddingHorizontal: 20, backgroundColor: "#eff6ff", borderRadius: 12, marginBottom: 8 },
-  copyCraftBtnText: { fontSize: 14, fontWeight: "600", color: "#2563eb" },
-  craftPreview: { fontSize: 12, color: "#6b7280", marginBottom: 16, textAlign: "center" },
+  revealHintWrap: { minHeight: 48, marginTop: 10, marginBottom: 12, justifyContent: "center" },
+  revealHint: { fontSize: 14, color: "#1e40af", fontWeight: "600", lineHeight: 21 },
+  revealHintMuted: { fontSize: 14, color: "#6b7280", marginLeft: 8 },
+  revealAiLoadingRow: { flexDirection: "row", alignItems: "center" },
+  revealCoachHint: { fontSize: 13, color: "#6b7280", lineHeight: 20, marginBottom: 16 },
   safetyModalBody: { fontSize: 14, color: "#374151", marginBottom: 8, lineHeight: 20 },
   safetyPreview: { fontSize: 12, color: "#6b7280", marginBottom: 12, fontStyle: "italic" },
   safetyContactInput: { borderWidth: 1, borderColor: "#d1d5db", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, marginBottom: 16, backgroundColor: "#fff" },

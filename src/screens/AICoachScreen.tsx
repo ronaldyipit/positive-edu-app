@@ -1,4 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import type { RootTabParamList } from "../navigation/types";
 import {
   View,
   Text,
@@ -15,34 +18,39 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { AppBackground } from "../components/AppBackground";
 
-const STRENGTH_CITATION_URL = "https://www.cityu.edu.hk/ss_posed/content.aspx?lang=zh&title=12";
+const STRENGTH_CITATION_URL =
+  "https://global.oup.com/academic/product/character-strengths-and-virtues-9780195167016";
 
-/** 24 項性格優勢定義（參考 Peterson & Seligman, 2004；香港城市大學正向教育研究室） */
+/** 完整出處（性格優勢分類與定義） */
+const PETERSON_SELIGMAN_2004_CITATION =
+  "Peterson, C., & Seligman, M. E. P. (2004). Character strengths and virtues: A handbook and classification. New York: Oxford University Press and Washington, DC: American Psychological Association.";
+
+/** 24 項性格優勢定義（參考 Peterson & Seligman, 2004；以下為意義相近之改述） */
 const STRENGTH_DEFINITIONS: Record<string, string> = {
-  creativity: "能够想出新方法去做事。如果有更好的方法，決不會滿足於用傳統方法去做同樣的事。",
-  curiosity: "對任何事都感到好奇。經常發問，對所有話題和題目感到著迷，並喜歡探索和發掘新事物。",
-  judgment: "能從多角度思考和考證事物是你重要的特質。不會妄下結論，只會根據實際的證據做決定。",
-  "love-of-learning": "喜愛學習新事物。喜愛上學、閱讀、參觀博物館和任何有機會學習的地方。",
-  perspective: "不認為自己有智慧，但自己的朋友卻看得到。重視自己對事物的洞察力，並向人尋求意見。",
-  bravery: "無所畏懼，不會在威脅、挑戰、困難或痛苦面前畏縮。即使面對反抗，仍會為正義而發聲，並根據自己的信念而行動。",
-  perseverance: "努力去完成自己開展的工作。無論怎樣的工作都會盡力準時完成，工作時不會分心，並在完成工作的過程中獲得滿足感。",
-  honesty: "誠實的人不止說實話，還會以真誠和真摰的態度生活，不虛偽，是個「真心」的人。",
-  zest: "無論做什麼事都懷著興奮的心情和幹勁。做事不會半途而廢，對你而言生命是一場歷險。",
-  love: "重視與別人的親密關係，特別是那些互相分享與關懷的關係。那些給你最親密感覺的人，同樣感到與你最親密。",
-  kindness: "對別人仁慈和寬宏大量。別人請你做事從不推搪，享受為別人做好事，即使是認識不深的人。",
-  "social-intelligence": "明白別人的動機和感受。在不同的社交場合知道該做甚麼，才能使其他人感到自在。",
-  citizenship: "作為團隊的一份子表現突出。你是效忠和致力於團隊的隊員，經常完成自己的分內事，並為團隊的成功而努力。",
-  fairness: "對所有人公平是堅持不變的原則。不會因為個人感情而對別人作出有偏差的判斷，並給予每個人平等的機會。",
-  leadership: "在領導方面表現出色。鼓勵組員完成工作，令每名組員有歸屬感，維持團隊的和諧。",
-  forgiveness: "寬恕那些對不起自己的人，常常給別人第二次機會。座右銘是慈悲，不是報復。",
-  humility: "不追求別人的注視，比較喜歡讓成就不言而喻。不認為自己很特別，而謙遜是公認和受重視的。",
-  prudence: "很小心，做選擇時總是一貫地審慎行事。不會說那些將來會後悔的話，或是做將來會後悔的事。",
-  "self-regulation": "自覺地規範自己的感覺與行為，是個自律的人。對食量和情緒有自制力，不會反被它們支配。",
-  appreciation: "在生命中的一切，從大自然、藝術、數學、科學以至日常生活體驗，都有留意和欣賞其美麗、優秀和富技巧之處。",
-  gratitude: "留意發生在自己身上的好事，但從不會視為理所當然。因為常常表達謝意，身邊的人知道你是個懂得感恩的人。",
-  hope: "對未來有最好的期望，並努力達成心願。相信未來掌握在自己手中。",
-  humor: "喜歡大笑和逗別人快樂，為別人帶來歡笑很重要。在任何情況下都嘗試去看事情輕鬆的一面。",
-  spirituality: "對崇高的人生目標和宇宙意義有着強烈和貫徹的信念。知道自己怎樣在大環境中作出配合，信念塑造行為，也成了慰藉之源。"
+  creativity: "樂於以新方式處理事務；一旦發現更佳途徑，便不願停留在舊有做法。",
+  curiosity: "對周遭保持求知慾，常提問、好探索，願意主動發掘尚未了解的事物。",
+  judgment: "習慣從多面向檢視議題，不憑空臆斷，而是依據事實與理據下判斷。",
+  "love-of-learning": "真心享受吸收新知，不論課堂、閱讀、展館或任何學習情境都樂在其中。",
+  perspective: "未必自詡聰穎，但旁人常覺得你有遠見；你重視反思，也樂於徵詢他人意見。",
+  bravery: "面對威脅、難關或壓力仍敢向前；即使遭遇反對，仍會依信念為公義發聲。",
+  perseverance: "一旦開始便會貫徹到底，盡力準時完成、專注不散漫，並從完成過程中獲得滿足。",
+  honesty: "不只口說真話，生活態度也真摯一致，不造作，待人以誠為本。",
+  zest: "做什麼都帶著熱情與活力，輕易不言棄；對你而言，生命像一場願意全情投入的旅程。",
+  love: "珍惜彼此分享與關顧的親密關係；與你最親近的人，同樣感到與你心靈相近。",
+  kindness: "待人寬厚，樂於伸出援手；有人需要幫忙時少推託，對相識不深者亦願多走一步。",
+  "social-intelligence": "能察覺他人的動機與感受，並在不同場合調整言行，使眾人相處得自在。",
+  citizenship: "在群體中盡責投入，信守承諾、做好本分，並為整體成果貢獻心力。",
+  fairness: "堅持一視同仁，不因私情而偏袒，願給每人合理且平等的機會。",
+  leadership: "擅長帶領眾人朝目標前進，使成員有歸屬與士氣，並維繫團隊和諧。",
+  forgiveness: "對曾傷害自己的人仍願釋懷，多給機會重修關係；取向是寬容而非報復。",
+  humility: "不刻意博取注目，寧以成果說話；不認為自己高人一等，謙遜是你受敬重的一環。",
+  prudence: "做決定前習慣深思，言行謹慎；避免說出或做出日後會懊悔的事。",
+  "self-regulation": "能自覺調節情緒與行為，對飲食、衝動與心情有所節制，不易被其牽制。",
+  appreciation: "能在自然、藝術、學問以至日常細節中，察覺美、卓越與工巧之處。",
+  gratitude: "會留意並珍惜身邊好事，不視一切為理所當然；常表達謝意，讓人感受到你的感恩之心。",
+  hope: "對將來抱持正面想像，並願付諸行動；相信努力可以影響前路。",
+  humor: "喜歡歡笑與為人帶來輕鬆感；即使處境不易，仍嘗試以幽默角度紓緩壓力。",
+  spirituality: "對人生意義或更大格局懷有穩定信念，明白自己於世界中的位置；信念指引行動，亦帶來內在平安。"
 };
 
 type Message = {
@@ -71,6 +79,15 @@ function parseBoldSegments(str: string): { text: string; bold: boolean }[] {
     remaining = remaining.slice(j + 2);
   }
   return parts;
+}
+
+/** 後端教練回覆可結尾附 [[SHREDDER]]，前端改為顯示前往「抒壓碎紙機」的連結 */
+const SHREDDER_NAV_TOKEN = "[[SHREDDER]]";
+
+function stripShredderNavToken(text: string): { body: string; showShredderLink: boolean } {
+  const showShredderLink = text.includes(SHREDDER_NAV_TOKEN);
+  const body = text.replace(/\[\[SHREDDER\]\]/g, "").trim();
+  return { body, showShredderLink };
 }
 
 // Use .env EXPO_PUBLIC_COACH_API_URL for backend URL (e.g. http://192.168.68.120:4000 on LAN).
@@ -185,14 +202,69 @@ const typingStyles = StyleSheet.create({
 });
 
 export default function AICoachScreen() {
+  const route = useRoute<RouteProp<RootTabParamList, "正向教練">>();
+  const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
+  const pendingFlowPrefillRef = useRef<string | null>(null);
+  const [flowPrefillPending, setFlowPrefillPending] = useState(false);
+
   // "strengths-select" → 先選優勢；"chat" → 進入對話
   const [screen, setScreen] = useState<"strengths-select" | "chat">("strengths-select");
   const [definitionStrengthId, setDefinitionStrengthId] = useState<string | null>(null);
+  const [showStrengthIntroModal, setShowStrengthIntroModal] = useState(false);
   const [selectedStrengths, setSelectedStrengths] = useState<string[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+
+  const handleStartChatRef = useRef<() => void>(() => {});
+
+  const handleStartChat = useCallback(() => {
+    const strengthLabels = selectedStrengths
+      .map((id) => getStrengthById(id)?.label)
+      .filter(Boolean)
+      .join("、");
+
+    const intro =
+      selectedStrengths.length > 0
+        ? `你好！我是 AI 正向心態教練 🌱\n\n你選擇了你的核心優勢：**${strengthLabels}**。\n\n我會在對話中幫你善用這些優勢來面對挑戰。今天你想談什麼？若一時未能描述清楚，可從上方情緒按鈕選一個開始對話。`
+        : "你好！我是 AI 正向心態教練 🌱\n\n今天你想談什麼？若一時未能描述清楚，可從上方情緒按鈕選一個開始對話；或直接輸入。";
+
+    setMessages([{ id: "intro", from: "coach", text: intro }]);
+    setScreen("chat");
+  }, [selectedStrengths]);
+
+  handleStartChatRef.current = handleStartChat;
+
+  /** 離線深潛 → navigate 帶入 coachPrefillFromFlow */
+  useEffect(() => {
+    const raw = route.params?.coachPrefillFromFlow;
+    if (typeof raw !== "string" || !raw.trim()) return;
+    const text = raw.trim();
+    navigation.setParams({ coachPrefillFromFlow: undefined } as never);
+    pendingFlowPrefillRef.current = text;
+    const n = selectedStrengths.length;
+    const onChat = screen === "chat";
+    setFlowPrefillPending(n < 3);
+    if (n === 3) {
+      setFlowPrefillPending(false);
+      if (!onChat) {
+        handleStartChatRef.current();
+      } else {
+        setInput(text);
+        pendingFlowPrefillRef.current = null;
+      }
+    }
+  }, [route.params?.coachPrefillFromFlow, selectedStrengths.length, screen, navigation]);
+
+  useEffect(() => {
+    if (screen === "chat" && pendingFlowPrefillRef.current) {
+      const t = pendingFlowPrefillRef.current;
+      pendingFlowPrefillRef.current = null;
+      setInput(t);
+      setFlowPrefillPending(false);
+    }
+  }, [screen]);
 
   const scrollToBottom = () => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -206,20 +278,6 @@ export default function AICoachScreen() {
         ? [...prev, id]
         : prev
     );
-  };
-
-  const handleStartChat = () => {
-    const strengthLabels = selectedStrengths
-      .map((id) => getStrengthById(id)?.label)
-      .filter(Boolean)
-      .join("、");
-
-    const intro = selectedStrengths.length > 0
-      ? `你好！我是 AI 正向心態教練 🌱\n\n你選擇了你的核心優勢：**${strengthLabels}**。\n\n我會在對話中幫你善用這些優勢來面對挑戰。今天你想談什麼？若一時未能描述清楚，可從上方情緒按鈕選一個開始對話。`
-      : "你好！我是 AI 正向心態教練 🌱\n\n今天你想談什麼？若一時未能描述清楚，可從上方情緒按鈕選一個開始對話；或直接輸入。";
-
-    setMessages([{ id: "intro", from: "coach", text: intro }]);
-    setScreen("chat");
   };
 
   const handleSend = async (overrideText?: string) => {
@@ -275,16 +333,23 @@ export default function AICoachScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.selectContainer}>
         <Text style={styles.title}>AI 正向心態教練</Text>
 
+        {flowPrefillPending ? (
+          <View style={styles.flowPrefillBanner}>
+            <Text style={styles.flowPrefillBannerText}>
+              你已從「離線深潛」帶備想同教練講嘅內容。請先選滿 3 個性格優勢，再按下方開始對話，輸入框會自動預填。
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.resonanceBlock}>
           <Text style={styles.resonanceText}>
-            成日被人話「你唔夠好」、淨係睇成績？其實你身上有好多強項，只係未有人同你一齊發掘。讀書、測驗、人際……壓力好大時，認識自己嘅性格強項，可以幫你更有力、更接納自己。
+            成日被人話「你唔夠好」、淨係睇成績？其實你身上有好多強項，只係未有人同你一齊發掘。讀書、測驗、人際……壓力好大時，認識自己嘅性格優勢，可以幫你更有力、更接納自己。
           </Text>
         </View>
 
-        <Text style={styles.introHeading}>甚麼是性格強項？</Text>
-        <Text style={styles.introBody}>
-          性格強項由心理學家 Peterson 與 Seligman 提出，他們識別出六種美德及二十四種性格強項（Peterson & Seligman, 2004）。當我們發現、承認並在日常生活中運用這些強項時，會更愉快、更有成就、更具彈性，對生活更滿意（Seligman, 2011；香港城市大學正向教育研究室，n.d.）。
-        </Text>
+        <TouchableOpacity style={styles.infoTriggerBtn} onPress={() => setShowStrengthIntroModal(true)}>
+          <Text style={styles.infoTriggerText}>甚麼是性格優勢？（按此查看）</Text>
+        </TouchableOpacity>
 
         <Text style={styles.selectHeading}>想想你最突出的 3 個性格優勢</Text>
         <Text style={styles.selectDesc}>
@@ -360,9 +425,7 @@ export default function AICoachScreen() {
                   <Text style={styles.defModalBody}>
                     {STRENGTH_DEFINITIONS[definitionStrengthId]}
                   </Text>
-                  <Text style={styles.defModalCitation}>
-                    參考：香港城市大學正向教育研究室「美德與品格強項」(Peterson & Seligman, 2004)
-                  </Text>
+                  <Text style={styles.defModalCitation}>參考：{PETERSON_SELIGMAN_2004_CITATION}</Text>
                   <TouchableOpacity
                     style={styles.defModalLink}
                     onPress={() => Linking.openURL(STRENGTH_CITATION_URL)}
@@ -372,6 +435,30 @@ export default function AICoachScreen() {
                   </TouchableOpacity>
                 </>
               ) : null}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
+
+        <Modal
+          visible={showStrengthIntroModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowStrengthIntroModal(false)}
+        >
+          <TouchableOpacity style={styles.defModalOverlay} activeOpacity={1} onPress={() => setShowStrengthIntroModal(false)}>
+            <TouchableOpacity style={styles.defModalContent} activeOpacity={1} onPress={() => {}}>
+              <View style={styles.defModalHeader}>
+                <Text style={styles.defModalTitle}>甚麼是性格優勢？</Text>
+                <TouchableOpacity onPress={() => setShowStrengthIntroModal(false)} hitSlop={12}>
+                  <Ionicons name="close" size={24} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.defModalBody}>
+                性格優勢由心理學家 Peterson 與 Seligman 提出，他們識別出六種美德及二十四種性格優勢（Peterson & Seligman, 2004）。
+                當我們發現、承認並在日常生活中運用這些優勢時，會更愉快、更有成就、更具彈性，對生活更滿意（Seligman, 2011）。
+                {"\n\n"}
+                出處：{PETERSON_SELIGMAN_2004_CITATION}
+              </Text>
             </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
@@ -394,12 +481,11 @@ export default function AICoachScreen() {
 
         <Text style={styles.citationFooter}>
           性格優勢分類參考：{" "}
-          <Text
-            style={styles.citationLink}
-            onPress={() => Linking.openURL(STRENGTH_CITATION_URL)}
-          >
-            香港城市大學正向教育研究室 — 美德與品格強項
+          <Text style={styles.citationLink} onPress={() => Linking.openURL(STRENGTH_CITATION_URL)}>
+            Peterson & Seligman (2004)
           </Text>
+          {"\n"}
+          <Text style={styles.citationFooterDetail}>{PETERSON_SELIGMAN_2004_CITATION}</Text>
         </Text>
       </ScrollView>
         </View>
@@ -467,17 +553,37 @@ export default function AICoachScreen() {
               <View style={styles.avatar}><Text style={styles.avatarText}>🌱</Text></View>
             )}
             <View style={[styles.bubble, m.from === "user" ? styles.userBubble : styles.coachBubble]}>
-              <Text style={[styles.bubbleText, m.from === "user" && styles.userBubbleText]}>
-                {m.from === "coach"
-                  ? parseBoldSegments(m.text).map((seg, i) =>
-                      seg.bold ? (
-                        <Text key={i} style={[styles.bubbleText, styles.bubbleTextBold]}>{seg.text}</Text>
-                      ) : (
-                        seg.text
-                      )
-                    )
-                  : m.text}
-              </Text>
+              {m.from === "coach" ? (
+                (() => {
+                  const { body, showShredderLink } = stripShredderNavToken(m.text);
+                  return (
+                    <View>
+                      <Text style={styles.bubbleText}>
+                        {parseBoldSegments(body).map((seg, i) =>
+                          seg.bold ? (
+                            <Text key={i} style={[styles.bubbleText, styles.bubbleTextBold]}>
+                              {seg.text}
+                            </Text>
+                          ) : (
+                            seg.text
+                          )
+                        )}
+                      </Text>
+                      {showShredderLink ? (
+                        <TouchableOpacity
+                          style={styles.shredderLinkWrap}
+                          onPress={() => navigation.navigate("抒壓")}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.shredderLinkText}>→ 開啟抒壓碎紙機</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  );
+                })()
+              ) : (
+                <Text style={[styles.bubbleText, styles.userBubbleText]}>{m.text}</Text>
+              )}
             </View>
             {m.from === "user" && (
               <View style={styles.avatar}><Text style={styles.avatarText}>🙂</Text></View>
@@ -537,6 +643,15 @@ const styles = StyleSheet.create({
   // Strengths select
   selectContainer: { padding: 16, paddingBottom: 40 },
   title: { fontSize: 20, fontWeight: "700", color: "#111827", marginBottom: 14, paddingHorizontal: 4 },
+  flowPrefillBanner: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#bfdbfe"
+  },
+  flowPrefillBannerText: { fontSize: 13, color: "#1e40af", lineHeight: 20 },
   resonanceBlock: {
     backgroundColor: "#fff7ed",
     borderRadius: 12,
@@ -550,13 +665,16 @@ const styles = StyleSheet.create({
     color: "#78350f",
     lineHeight: 22
   },
-  introHeading: { fontSize: 15, fontWeight: "700", color: "#374151", marginBottom: 6 },
-  introBody: {
-    fontSize: 13,
-    color: "#4b5563",
-    lineHeight: 20,
+  infoTriggerBtn: {
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     marginBottom: 14
   },
+  infoTriggerText: { fontSize: 13, color: "#1d4ed8", fontWeight: "700", textAlign: "center" },
   selectHeading: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 6 },
   selectDesc: { fontSize: 13, color: "#4b5563", marginBottom: 8, lineHeight: 20 },
   selectDefHint: { fontSize: 12, color: "#78716c", marginBottom: 14, fontStyle: "italic" },
@@ -600,6 +718,7 @@ const styles = StyleSheet.create({
   defModalLink: { flexDirection: "row", alignItems: "center", gap: 4 },
   defModalLinkText: { fontSize: 13, color: "#d56c2f", fontWeight: "600" },
   citationFooter: { fontSize: 11, color: "#9ca3af", marginTop: 16, marginBottom: 8 },
+  citationFooterDetail: { fontSize: 10, color: "#9ca3af", marginTop: 6, lineHeight: 15 },
   citationLink: { color: "#d56c2f", textDecorationLine: "underline" },
   virtueSection: { marginBottom: 18 },
   virtueTitle: { fontSize: 14, fontWeight: "700", color: "#374151", marginBottom: 8 },
@@ -675,6 +794,8 @@ const styles = StyleSheet.create({
   },
   bubbleText: { fontSize: 14, color: "#111827", lineHeight: 20 },
   bubbleTextBold: { fontWeight: "700" },
+  shredderLinkWrap: { marginTop: 10, alignSelf: "flex-start" },
+  shredderLinkText: { fontSize: 14, color: "#d56c2f", fontWeight: "700", textDecorationLine: "underline" },
   userBubbleText: { color: "#fff" },
   // Input
   inputRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, gap: 8 },

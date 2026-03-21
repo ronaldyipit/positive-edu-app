@@ -10,9 +10,11 @@ import {
 } from "react-native";
 import { doc, getDoc } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { AppBackground } from "../components/AppBackground";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../config/firebase";
+import { getGamificationState, getLevelName, LEVEL_XP } from "../utils/gamification";
 
 const MODULES = [
   {
@@ -44,9 +46,9 @@ const MODULES = [
   },
   {
     id: "感恩",
-    title: "感恩卡",
-    desc: "製作感恩卡，送給你想感謝的人",
-    emoji: "💌",
+    title: "火炬傳暖",
+    desc: "用三種方式回應善意：答謝、默默報答、傳揚開去",
+    emoji: "🔥",
     accent: "#c026d3",
     bg: "#fdf4ff",
     border: "#f5d0fe"
@@ -79,6 +81,8 @@ export default function HomeScreen({
     null;
   const quote = getDailyQuote();
   const animValues = useRef(MODULES.map(() => new Animated.Value(0))).current;
+  const [level, setLevel] = useState(1);
+  const [xp, setXp] = useState(0);
 
   useEffect(() => {
     if (!user?.uid || !db) return;
@@ -89,6 +93,17 @@ export default function HomeScreen({
       })
       .catch(() => {});
   }, [user?.uid]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      getGamificationState()
+        .then((g) => {
+          setLevel(g.level);
+          setXp(g.xp);
+        })
+        .catch(() => {});
+    }, [])
+  );
 
   useEffect(() => {
     Animated.parallel(
@@ -123,6 +138,13 @@ export default function HomeScreen({
             </Text>
             <View style={styles.quoteWrap}>
               <Text style={styles.quote}>{quote}</Text>
+            </View>
+            <View style={styles.levelWrap}>
+              <Text style={styles.levelTitle}>目前等級：Lv.{level}・{getLevelName(level)}</Text>
+              <View style={styles.levelBar}>
+                <View style={[styles.levelFill, { width: `${Math.max(0, Math.min(100, (xp / LEVEL_XP) * 100))}%` }]} />
+              </View>
+              <Text style={styles.levelSub}>距離下一級尚餘 {LEVEL_XP - xp} XP</Text>
             </View>
             <Text style={styles.subtitle}>選擇一個功能開始吧</Text>
 
@@ -225,6 +247,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "600"
   },
+  levelWrap: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#bfdbfe"
+  },
+  levelTitle: { fontSize: 13, color: "#1e40af", fontWeight: "700", marginBottom: 6, textAlign: "center" },
+  levelBar: { height: 8, borderRadius: 999, backgroundColor: "#dbeafe", overflow: "hidden", marginBottom: 6 },
+  levelFill: { height: "100%", backgroundColor: "#2563eb" },
+  levelSub: { fontSize: 11, color: "#1d4ed8", textAlign: "center" },
   subtitle: {
     fontSize: 13,
     color: "#78716c",

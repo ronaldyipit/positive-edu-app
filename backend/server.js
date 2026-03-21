@@ -173,7 +173,11 @@ app.post("/api/coach", async (req, res) => {
       "You focus on PERMA Meaning: helping students find meaning, notice character strengths, and build resilience. " +
       "Keep a warm, hopeful, and non-judgmental tone. Respond in 2-4 sentences maximum per reply. " +
       "If the user hints at self-harm or severe distress, encourage them to seek immediate help from a trusted adult, " +
-      "school social worker, or call the Samaritan Befrienders Hong Kong hotline 2389-2222.";
+      "school social worker, or call the Samaritan Befrienders Hong Kong hotline 2389-2222. " +
+      "When the user clearly expresses worry, rumination, or a problem that cannot be fixed right away, you may briefly say in Traditional Chinese " +
+      "(Cantonese-friendly tone) that even if the issue is not solved yet, they can use the in-app 「抒壓碎紙機」to temporarily set the worry aside and ease their mind—not to avoid life forever, but to regulate first. " +
+      "Only in those cases, end your entire reply with a new line and the exact token [[SHREDDER]] on its own (no punctuation after it). " +
+      "Do not add [[SHREDDER]] on every reply; skip it for light or neutral topics.";
 
     const response = await client.chat.completions.create({
       model: "GPT-5.2",
@@ -221,7 +225,7 @@ app.post("/api/gratitude-text", async (req, res) => {
   }
 });
 
-// 深潛「心流時差」：根據用戶覺得的時間 vs 實際時間，生成一句 AI 回饋（繁體中文）
+// 深潛收尾：心流時差一句 + AI 深潛小結（2–4 句），單次呼叫
 app.post("/api/flow-time-feedback", async (req, res) => {
   try {
     if (!poeApiKey) {
@@ -233,13 +237,12 @@ app.post("/api/flow-time-feedback", async (req, res) => {
     const taskStr = typeof task === "string" && task.trim() ? task.trim() : "剛才的活動";
 
     const systemPrompt =
-      "你是「正發光」App 的心流回饋助手。用戶完成一段深潛後，會輸入「我覺得過了 X 分鐘」與「實際 Y 分鐘」。 " +
-      "請根據 X 與 Y 的關係，用繁體中文寫「一句」溫暖、簡短的回饋（約 20–40 字），不要說教。 " +
-      "若實際 > 覺得：時間過得比感覺快，可肯定他進入深層心流、專注。 " +
-      "若實際 < 覺得：時間過得比感覺慢，可肯定他投入當下、時間感充實。 " +
-      "若實際 ≈ 覺得：可說他與時間同步、心流剛剛好。 " +
-      "只輸出那一句話，不要標題、不要引號、不要換行。";
-    const userMessage = `用戶覺得過了 ${felt} 分鐘，實際是 ${actual} 分鐘。任務／情境：${taskStr}。請給一句回饋。`;
+      "你是「正發光」App 的深潛收尾助手，讀者為香港中學生。用戶完成離線深潛：自覺過了 felt 分鐘，實際 actual 分鐘，任務為 task。 " +
+      "只輸出一個 JSON 物件（不要 markdown、不要程式碼框），鍵名固定： " +
+      '{"brief":"繁體中文一句話約 25–45 字，呼應 felt 與 actual 的心流時差，溫暖、唔說教。若 actual>felt 可暗示專注到唔覺時間快；actual<felt 可暗示時間感好充實；相近就話節奏啱啱好。",' +
+      '"summary":"繁體中文一段，必須 2 至 4 個完整句子。先肯定佢完成深潛；中間一句輕觸心流／專注（可提挑戰與技能要平衡、或訂清晰小目標）；最後一句係明日可以試嘅具體小建議。口語自然，唔好用英文術語堆砌。"}';
+
+    const userMessage = JSON.stringify({ felt, actual, task: taskStr });
 
     const response = await client.chat.completions.create({
       model: "GPT-5.2",
@@ -247,11 +250,34 @@ app.post("/api/flow-time-feedback", async (req, res) => {
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage }
       ],
-      temperature: 0.6
+      temperature: 0.55
     });
-    const message = response.choices[0]?.message?.content?.trim() || "";
-    if (!message) return res.status(500).json({ error: "No feedback generated." });
-    res.json({ message });
+    let raw = response.choices[0]?.message?.content?.trim() || "";
+    if (raw.startsWith("```")) {
+      raw = raw.replace(/^```\w*\r?\n?/, "").replace(/\r?\n?```\s*$/, "");
+    }
+    let brief = "";
+    let summary = "";
+    try {
+      const j = JSON.parse(raw);
+      brief = String(j.brief || j.message || "").trim();
+      summary = String(j.summary || "").trim();
+    } catch {
+      brief = raw.slice(0, 120).replace(/\n/g, " ");
+    }
+    if (!brief) {
+      brief =
+        actual > felt
+          ? "剛才你專注到時間好似過得好快，呢種感覺好難得。"
+          : actual < felt
+            ? "你覺得過咗好耐，代表你有投入喺件事上面。"
+            : "你同時間節奏好夾，呢段深潛好穩陣。";
+    }
+    if (!summary) {
+      summary =
+        "你願意俾自己一段離線專注嘅時間，已經好難得。心流好多時出現喺「有挑戰但做得到」同目標清晰嘅時候。下次可以試住開場先用一句寫低「今次要做到邊一步」，再開始計時，會更易進入狀態。";
+    }
+    res.json({ message: brief, summary });
   } catch (error) {
     console.error("Error in /api/flow-time-feedback:", error);
     res.status(500).json({ error: "Flow time feedback failed." });
