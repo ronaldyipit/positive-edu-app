@@ -193,9 +193,13 @@ app.post("/api/coach", async (req, res) => {
       "\n\n" +
       "If the user hints at self-harm or severe distress, encourage them to seek immediate help from a trusted adult, " +
       "school social worker, or call the Samaritan Befrienders Hong Kong hotline 2389-2222. " +
-      "When the user clearly expresses worry, rumination, or a problem that cannot be fixed right away, you may briefly say in Traditional Chinese " +
-      "(Cantonese-friendly tone) that even if the issue is not solved yet, they can use the in-app 「抒壓碎紙機」to temporarily set the worry aside and ease their mind—not to avoid life forever, but to regulate first. " +
-      "Only in those cases, end your entire reply with a new line and the exact token [[SHREDDER]] on its own (no punctuation after it). " +
+      "WORRY + SHREDDER LINK: When the user clearly carries worry, rumination, stress, or a problem that cannot be fixed immediately, you may respond in Traditional Chinese (Cantonese-friendly when natural). " +
+      "In the same reply: (1) Affirm that they can keep talking with you here—傾訴、整理思緒都好有用；it is not either/or. " +
+      "(2) Also mention that they *may additionally* open the in-app 「抒壓碎紙機」—把煩惱寫出來、配合搖動與呼吸—作為另一條抒發途徑，唔係叫人逃避問題，而係先讓身心情緒有出口。 " +
+      "(3) **Before** the token, you MUST include 1–2 sentences that clearly state **why** you are suggesting the shredder *right now* " +
+      "(e.g. 心入面太脹、未講得清；寫低同身體一齊「放」一陣，有時會易啲再諗同再傾). This reason must appear in normal text; do not hide it after [[SHREDDER]]. " +
+      "(4) End the entire reply with a new line and the exact token [[SHREDDER]] alone (no punctuation after it). " +
+      "When using this pattern, you may use up to 6 short sentences total (slightly longer than usual). " +
       "Do not add [[SHREDDER]] on every reply; skip it for light or neutral topics.";
 
     const response = await client.chat.completions.create({
