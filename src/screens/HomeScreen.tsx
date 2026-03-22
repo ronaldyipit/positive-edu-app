@@ -19,7 +19,7 @@ import { getGamificationState, getLevelName, LEVEL_XP } from "../utils/gamificat
 const MODULES = [
   {
     id: "正向教練",
-    title: "正向教練 (AI聊天機器人)",
+    title: "正向教練",
     desc: "善用性格優勢對話，建立正向心態",
     emoji: "🌱",
     accent: "#16a34a",
