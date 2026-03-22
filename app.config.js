@@ -9,12 +9,18 @@ module.exports = {
     orientation: "portrait",
     scheme: "com.positiveedu.companion",
     userInterfaceStyle: "light",
+    /** 建置 APK／IPA 時嘅啟動圖示（建議 1024×1024 PNG） */
+    icon: "./assets/img/AppLogo.png",
     assetBundlePatterns: ["**/*"],
     ios: { supportsTablet: true },
     android: {
       package: "com.positiveedu.companion",
       // 強制使用 Hermes，避免向 JitPack 拉 jsc-android（Read timed out）
-      jsEngine: "hermes"
+      jsEngine: "hermes",
+      adaptiveIcon: {
+        foregroundImage: "./assets/img/AppLogo.png",
+        backgroundColor: "#fefce8"
+      }
     },
     plugins: [
       [
