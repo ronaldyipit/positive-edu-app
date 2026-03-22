@@ -42,7 +42,7 @@ function MainTabs() {
           if (route.name === "主頁") iconName = "home-outline";
           else if (route.name === "正向教練") iconName = "chatbubbles-outline";
           else if (route.name === "離線深潛") iconName = "timer-outline";
-          else if (route.name === "抒壓") iconName = "construct-outline";
+          else if (route.name === "紓壓") iconName = "construct-outline";
           else if (route.name === "感恩") iconName = "heart-outline";
           else if (route.name === "設定") iconName = "settings-outline";
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -54,7 +54,11 @@ function MainTabs() {
       <Tab.Screen name="主頁" component={HomeScreen} />
       <Tab.Screen name="正向教練" component={AICoachScreen} />
       <Tab.Screen name="離線深潛" component={FlowTimerScreen} />
-      <Tab.Screen name="抒壓" component={SomaticShredderScreen} />
+      <Tab.Screen
+        name="紓壓"
+        component={SomaticShredderScreen}
+        options={{ tabBarLabel: "紓壓碎紙" }}
+      />
       <Tab.Screen
         name="感恩"
         component={GratitudeCardScreen}

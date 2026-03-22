@@ -19,8 +19,8 @@ import { getGamificationState, getLevelName, LEVEL_XP } from "../utils/gamificat
 const MODULES = [
   {
     id: "正向教練",
-    title: "正向教練",
-    desc: "用性格優勢與 AI 教練對話，建立正向心態",
+    title: "正向教練 (AI聊天機器人)",
+    desc: "善用性格優勢對話，建立正向心態",
     emoji: "🌱",
     accent: "#16a34a",
     bg: "#f0fdf4",
@@ -36,8 +36,8 @@ const MODULES = [
     border: "#bfdbfe"
   },
   {
-    id: "抒壓",
-    title: "抒壓碎紙機",
+    id: "紓壓",
+    title: "紓壓碎紙",
     desc: "寫下壓力、搖動粉碎，再以呼吸平靜下來",
     emoji: "📱",
     accent: "#ea580c",

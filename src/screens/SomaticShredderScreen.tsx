@@ -9,12 +9,12 @@ import {
   Easing,
   ScrollView,
   Platform,
-  Vibration,
-  Modal
+  Vibration
 } from "react-native";
 import { Accelerometer } from "expo-sensors";
 import { Audio } from "expo-av";
 import { AppBackground } from "../components/AppBackground";
+import { DefinitionInfoModal } from "../components/DefinitionInfoModal";
 
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "https://positive-edu-app.vercel.app";
 const MINDFULNESS_CITATION =
@@ -26,7 +26,7 @@ const ENCOURAGEMENTS = [
   "放下了，就輕了 🍃",
   "這一刻屬於你，好好呼吸 🌈",
   "每一次呼吸，都是重新開始 ✨",
-  "你用身體把它甩走了，幹得漂亮 🔥"
+  "你用身體把它甩走了，做得真棒 🔥"
 ];
 
 const BREATH_PHASES = [
@@ -91,7 +91,7 @@ export default function SomaticShredderScreen() {
     } catch {}
   };
 
-  // ── 加速度計監聯（僅原生 App；Web 用下方「點擊粉碎」按鈕）──
+  // ── 加速度計監聽（僅原生 App；Web 用下方「點擊粉碎」按鈕）──
   useEffect(() => {
     if (step !== "shake") return;
     if (Platform.OS === "web") return;
@@ -256,14 +256,14 @@ export default function SomaticShredderScreen() {
     <View style={styles.outerWrap}>
       <View style={styles.whiteCard}>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-      <Text style={styles.title}>抒壓碎紙機</Text>
+      <Text style={styles.title}>紓壓碎紙</Text>
 
       {/* ── Step 1: 共鳴 + 靜觀說明 + 模組任務（與離線深潛／正向教練格式一致）── */}
       {step === "write" && (
         <>
           <View style={styles.resonanceBlock}>
             <Text style={styles.resonanceText}>
-              成日谂住同一件事，瞓唔着、温唔入脑？{"\n"}
+              成日諗住同一件事，瞓唔著、溫唔入腦？{"\n"}
               有時唔係你唔夠堅強，係個腦同身體需要一個出口。寫低、動一動，再配合靜觀式嘅呼吸，可以幫你同壓力保持少少距離，慢慢鬆一鬆。
             </Text>
           </View>
@@ -273,19 +273,19 @@ export default function SomaticShredderScreen() {
           </TouchableOpacity>
 
           <View style={styles.moduleTaskBlock}>
-            <Text style={styles.moduleTaskTitle}>三步抒壓，慢慢鬆一鬆</Text>
+            <Text style={styles.moduleTaskTitle}>三步紓壓，慢慢鬆一鬆</Text>
             <Text style={styles.moduleTaskText}>
-              用三步幫你抒壓：先寫低煩惱 → 搖機「碎紙」象徵放手 → 最後做 4‑7‑8 呼吸，用靜觀方式安撫身體。唔使寫得好靚，亦唔會有人睇到你寫咩。
+              用三步幫你紓壓：先寫低煩惱 → 搖機「碎紙」象徵放手 → 最後做 4‑7‑8 呼吸，用靜觀方式安撫身體。唔使寫得好靚，亦唔會有人睇到你寫咩。
             </Text>
           </View>
 
           <Text style={styles.subtitle}>
-            把讓你煩惱的事寫出來。{"\n"}
-            寫出來本身就是一種釋放。
+            請將令你煩惱的事寫下來。{"\n"}
+            寫下來本身就是一種釋放。
           </Text>
           <TextInput
             style={styles.textArea}
-            placeholder="寫下讓你壓力大的事…不用擔心，沒有人會看到"
+            placeholder="寫下令你壓力大的事…不必擔心，沒有人會看見"
             placeholderTextColor="#9ca3af"
             multiline
             value={ventText}
@@ -296,7 +296,7 @@ export default function SomaticShredderScreen() {
             onPress={() => ventText.trim() && setStep("shake")}
             disabled={!ventText.trim()}
           >
-            <Text style={styles.primaryBtnText}>寫好了，去粉碎它 →</Text>
+            <Text style={styles.primaryBtnText}>寫好了，去粉碎 →</Text>
           </TouchableOpacity>
         </>
       )}
@@ -306,7 +306,7 @@ export default function SomaticShredderScreen() {
         <View style={styles.shakeSection}>
           <Text style={styles.shakeTitle}>📱 用力搖動你的手機！</Text>
           <Text style={styles.shakeDesc}>
-            把所有壓力傾注到搖動裡，讓身體把它甩走
+            將所有壓力傾注到搖動裡，讓身體把它甩走
           </Text>
 
           {/* 顯示要粉碎的文字 */}
@@ -443,30 +443,15 @@ export default function SomaticShredderScreen() {
       </View>
     </View>
 
-      <Modal
+      <DefinitionInfoModal
         visible={showMindfulnessModal}
-        transparent
-        animationType="fade"
         onRequestClose={() => setShowMindfulnessModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowMindfulnessModal(false)}
-        >
-          <TouchableOpacity style={styles.modalCard} activeOpacity={1} onPress={() => {}}>
-            <Text style={styles.modalTitle}>甚麼是靜觀？</Text>
-            <Text style={styles.modalBody}>
-              靜觀（mindfulness）係有意識地留意「而家此刻」：包括身體感覺、呼吸同腦入面飄過嘅念頭，唔使逼自己「咩都唔諗」。{"\n\n"}
-              重點唔係清空大腦，而係學識覺察、少啲即刻鬧自己；呼吸練習係靜觀入面好常用嘅一種方法，幫身體慢慢由「繃緊」回到較平靜嘅狀態。
-            </Text>
-            <Text style={styles.modalCitation}>出處：{MINDFULNESS_CITATION}</Text>
-            <TouchableOpacity style={[styles.primaryBtn, styles.modalCloseBtn]} onPress={() => setShowMindfulnessModal(false)}>
-              <Text style={styles.primaryBtnText}>關閉</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        title="甚麼是靜觀？"
+        citation={MINDFULNESS_CITATION}
+        bodyText={
+          "靜觀（mindfulness）是指以不加評判的態度，刻意將注意力帶回當下此刻，覺察此時此刻的身體感覺、呼吸，以及內在浮現的念頭與情緒；並非強求頭腦完全空白或壓抑思緒。\n\n重點在於培養覺察與接納，減少對當下經驗的立即貶抑。呼吸練習為靜觀取向介入中常見的方法之一，有助身體由緊繃逐步過渡至較為平穩的狀態。"
+        }
+      />
     </AppBackground>
   );
 }
@@ -510,24 +495,6 @@ const styles = StyleSheet.create({
   moduleTaskTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 6 },
   moduleTaskText: { fontSize: 13, color: "#334155", lineHeight: 20 },
   subtitle: { fontSize: 13, color: "#4b5563", marginBottom: 12, lineHeight: 20 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    padding: 24
-  },
-  modalCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
-    maxWidth: 400,
-    alignSelf: "center",
-    width: "100%"
-  },
-  modalTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 12 },
-  modalBody: { fontSize: 14, color: "#374151", lineHeight: 22 },
-  modalCitation: { fontSize: 11, color: "#64748b", marginTop: 10, fontStyle: "italic", lineHeight: 16 },
-  modalCloseBtn: { marginTop: 16, alignSelf: "stretch" },
   textArea: {
     minHeight: 130,
     borderRadius: 16,

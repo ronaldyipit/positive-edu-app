@@ -10,19 +10,23 @@ import {
   Platform,
   Image,
   Animated,
-  Linking,
-  Modal
+  Linking
 } from "react-native";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as IntentLauncher from "expo-intent-launcher";
 import { AppBackground } from "../components/AppBackground";
+import { DefinitionInfoModal } from "../components/DefinitionInfoModal";
 import * as MediaLibrary from "expo-media-library";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { awardXp } from "../utils/gamification";
 
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "https://positive-edu-app.vercel.app";
 const TASKS_PER_PAGE = 5;
+
+/** 感恩之操作型定義概括自 Emmons 對感恩情緒與傾向之論述（正向心理學常用架構） */
+const GRATITUDE_CITATION =
+  "Emmons, R. A. (2007). Thanks!: How the new science of gratitude can make you happier. Houghton Mifflin.";
 
 const MODES = [
   { id: "message", label: "1) 寫感謝訊息" },
@@ -875,25 +879,15 @@ export default function GratitudeCardScreen() {
     </ScrollView>
       </View>
     </View>
-    <Modal
+    <DefinitionInfoModal
       visible={showGratitudeIntroModal}
-      transparent
-      animationType="fade"
       onRequestClose={() => setShowGratitudeIntroModal(false)}
-    >
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowGratitudeIntroModal(false)}>
-        <TouchableOpacity style={styles.modalCard} activeOpacity={1} onPress={() => {}}>
-          <Text style={styles.modalTitle}>甚麼是感恩？</Text>
-          <Text style={styles.modalBody}>
-            感恩（gratitude）係有意識地留意並珍惜自己收到嘅幫助、善意同支持，並願意以說話或行動表達謝意。{"\n\n"}
-            感恩唔係忽略困難，而係喺壓力之中仍然睇到資源同連結，令自己更有力量面對下一步。
-          </Text>
-          <TouchableOpacity style={[styles.generateBtn, { alignSelf: "stretch", marginTop: 14 }]} onPress={() => setShowGratitudeIntroModal(false)}>
-            <Text style={styles.generateBtnText}>關閉</Text>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
+      title="甚麼是感恩？"
+      citation={GRATITUDE_CITATION}
+      bodyText={
+        "感恩（gratitude）在正向心理學的文獻中，常指能察覺並珍惜生命中所領受的美好、助力與善意，並意識到這些美好至少有一部分來自自身以外（例如他人、機會或其他來源），而伴隨感謝的情緒或較穩定的傾向。\n\n感恩並非要否定困境，而是在面對壓力時仍能辨識支持與資源、維繫與他人及環境的連結；亦可透過言語或行動向對方傳達謝意。"
+      }
+    />
     {showCompleteRelay ? (
       <Animated.View pointerEvents="none" style={[styles.completeOverlay, { opacity: completeOverlayOpacity }]}>
         <View style={styles.completeCard}>
@@ -1137,22 +1131,6 @@ const styles = StyleSheet.create({
   shareBtnText: { fontWeight: "700", fontSize: 15 },
   hintText: { fontSize: 12, color: "#9ca3af", textAlign: "center" }
   ,
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    padding: 24
-  },
-  modalCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 20,
-    maxWidth: 400,
-    alignSelf: "center",
-    width: "100%"
-  },
-  modalTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 12 },
-  modalBody: { fontSize: 14, color: "#374151", lineHeight: 22 },
   logBox: {
     marginTop: 16,
     backgroundColor: "#fff",

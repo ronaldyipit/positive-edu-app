@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppBackground } from "../components/AppBackground";
+import { DefinitionInfoModal } from "../components/DefinitionInfoModal";
 
 const STRENGTH_CITATION_URL =
   "https://global.oup.com/academic/product/character-strengths-and-virtues-9780195167016";
@@ -24,6 +25,9 @@ const STRENGTH_CITATION_URL =
 /** 完整出處（性格優勢分類與定義） */
 const PETERSON_SELIGMAN_2004_CITATION =
   "Peterson, C., & Seligman, M. E. P. (2004). Character strengths and virtues: A handbook and classification. New York: Oxford University Press and Washington, DC: American Psychological Association.";
+
+/** 與主頁模組、離線深潛等一致：單行標題（底部 Tab 仍為「正向教練」） */
+const COACH_MODULE_TITLE = "正向教練 (AI聊天機器人)";
 
 /** 24 項性格優勢定義（參考 Peterson & Seligman, 2004；以下為意義相近之改述） */
 const STRENGTH_DEFINITIONS: Record<string, string> = {
@@ -81,13 +85,30 @@ function parseBoldSegments(str: string): { text: string; bold: boolean }[] {
   return parts;
 }
 
-/** 後端教練回覆可結尾附 [[SHREDDER]]，前端改為顯示前往「抒壓碎紙機」的連結 */
-const SHREDDER_NAV_TOKEN = "[[SHREDDER]]";
+/**
+ * 後端可於回覆結尾附 [[SHREDDER]] / [[FLOW]] / [[TORCH]]（各佔一行），
+ * 前端移除 token 並顯示對應分頁連結。
+ */
+const COACH_NAV_LINK_ORDER = [
+  { token: "[[SHREDDER]]", screen: "紓壓" as const, label: "→ 開啟紓壓碎紙" },
+  { token: "[[FLOW]]", screen: "離線深潛" as const, label: "→ 開啟離線深潛" },
+  { token: "[[TORCH]]", screen: "感恩" as const, label: "→ 開啟火炬傳暖" }
+];
 
-function stripShredderNavToken(text: string): { body: string; showShredderLink: boolean } {
-  const showShredderLink = text.includes(SHREDDER_NAV_TOKEN);
-  const body = text.replace(/\[\[SHREDDER\]\]/g, "").trim();
-  return { body, showShredderLink };
+function stripCoachNavTokens(text: string): {
+  body: string;
+  links: { screen: keyof RootTabParamList; label: string }[];
+} {
+  const links: { screen: keyof RootTabParamList; label: string }[] = [];
+  let body = text;
+  for (const { token, screen, label } of COACH_NAV_LINK_ORDER) {
+    if (body.includes(token)) {
+      links.push({ screen, label });
+      body = body.split(token).join("");
+    }
+  }
+  body = body.replace(/\n{3,}/g, "\n\n").trim();
+  return { body, links };
 }
 
 // Use .env EXPO_PUBLIC_COACH_API_URL for backend URL (e.g. http://192.168.68.120:4000 on LAN).
@@ -227,8 +248,8 @@ export default function AICoachScreen() {
 
     const intro =
       selectedStrengths.length > 0
-        ? `你好！我是 AI 正向心態教練 🌱\n\n你選擇了你的核心優勢：**${strengthLabels}**。\n\n我會在對話中幫你善用這些優勢來面對挑戰。今天你想談什麼？若一時未能描述清楚，可從上方情緒按鈕選一個開始對話。`
-        : "你好！我是 AI 正向心態教練 🌱\n\n今天你想談什麼？若一時未能描述清楚，可從上方情緒按鈕選一個開始對話；或直接輸入。";
+        ? `你好！我是 ${COACH_MODULE_TITLE} 🌱\n\n你選擇了你的核心優勢：**${strengthLabels}**。\n\n我會在對話中幫你善用這些優勢來面對挑戰。今天你想談什麼？若一時未能描述清楚，可從上方情緒按鈕選一個開始對話。`
+        : `你好！我是 ${COACH_MODULE_TITLE} 🌱\n\n今天你想談什麼？若一時未能描述清楚，可從上方情緒按鈕選一個開始對話；或直接輸入。`;
 
     setMessages([{ id: "intro", from: "coach", text: intro }]);
     setScreen("chat");
@@ -331,7 +352,9 @@ export default function AICoachScreen() {
       <View style={styles.outerWrap}>
         <View style={styles.whiteCard}>
       <ScrollView style={styles.container} contentContainerStyle={styles.selectContainer}>
-        <Text style={styles.title}>AI 正向心態教練</Text>
+        <Text style={styles.title} accessibilityRole="header">
+          {COACH_MODULE_TITLE}
+        </Text>
 
         {flowPrefillPending ? (
           <View style={styles.flowPrefillBanner}>
@@ -439,29 +462,15 @@ export default function AICoachScreen() {
           </TouchableOpacity>
         </Modal>
 
-        <Modal
+        <DefinitionInfoModal
           visible={showStrengthIntroModal}
-          transparent
-          animationType="fade"
           onRequestClose={() => setShowStrengthIntroModal(false)}
-        >
-          <TouchableOpacity style={styles.defModalOverlay} activeOpacity={1} onPress={() => setShowStrengthIntroModal(false)}>
-            <TouchableOpacity style={styles.defModalContent} activeOpacity={1} onPress={() => {}}>
-              <View style={styles.defModalHeader}>
-                <Text style={styles.defModalTitle}>甚麼是性格優勢？</Text>
-                <TouchableOpacity onPress={() => setShowStrengthIntroModal(false)} hitSlop={12}>
-                  <Ionicons name="close" size={24} color="#64748b" />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.defModalBody}>
-                性格優勢由心理學家 Peterson 與 Seligman 提出，他們識別出六種美德及二十四種性格優勢（Peterson & Seligman, 2004）。
-                當我們發現、承認並在日常生活中運用這些優勢時，會更愉快、更有成就、更具彈性，對生活更滿意（Seligman, 2011）。
-                {"\n\n"}
-                出處：{PETERSON_SELIGMAN_2004_CITATION}
-              </Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </Modal>
+          title="甚麼是性格優勢？"
+          citation={PETERSON_SELIGMAN_2004_CITATION}
+          bodyText={
+            "性格優勢由心理學家 Peterson 與 Seligman 提出，他們識別出六種美德及二十四種性格優勢（Peterson & Seligman, 2004）。當我們發現、承認並在日常生活中運用這些優勢時，會更愉快、更有成就、更具彈性，對生活更滿意（Seligman, 2011）。"
+          }
+        />
 
         <Text style={styles.selectHint}>
           {selectedStrengths.length === 0
@@ -555,7 +564,7 @@ export default function AICoachScreen() {
             <View style={[styles.bubble, m.from === "user" ? styles.userBubble : styles.coachBubble]}>
               {m.from === "coach" ? (
                 (() => {
-                  const { body, showShredderLink } = stripShredderNavToken(m.text);
+                  const { body, links } = stripCoachNavTokens(m.text);
                   return (
                     <View>
                       <Text style={styles.bubbleText}>
@@ -569,15 +578,16 @@ export default function AICoachScreen() {
                           )
                         )}
                       </Text>
-                      {showShredderLink ? (
+                      {links.map((link, idx) => (
                         <TouchableOpacity
-                          style={styles.shredderLinkWrap}
-                          onPress={() => navigation.navigate("抒壓")}
+                          key={`${link.screen}-${idx}`}
+                          style={styles.moduleNavLinkWrap}
+                          onPress={() => navigation.navigate(link.screen)}
                           activeOpacity={0.7}
                         >
-                          <Text style={styles.shredderLinkText}>→ 開啟抒壓碎紙機</Text>
+                          <Text style={styles.moduleNavLinkText}>{link.label}</Text>
                         </TouchableOpacity>
-                      ) : null}
+                      ))}
                     </View>
                   );
                 })()
@@ -642,7 +652,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   // Strengths select
   selectContainer: { padding: 16, paddingBottom: 40 },
-  title: { fontSize: 20, fontWeight: "700", color: "#111827", marginBottom: 14, paddingHorizontal: 4 },
+  title: { fontSize: 22, fontWeight: "700", marginBottom: 12, color: "#111827" },
   flowPrefillBanner: {
     backgroundColor: "#eff6ff",
     borderRadius: 12,
@@ -794,8 +804,8 @@ const styles = StyleSheet.create({
   },
   bubbleText: { fontSize: 14, color: "#111827", lineHeight: 20 },
   bubbleTextBold: { fontWeight: "700" },
-  shredderLinkWrap: { marginTop: 10, alignSelf: "flex-start" },
-  shredderLinkText: { fontSize: 14, color: "#d56c2f", fontWeight: "700", textDecorationLine: "underline" },
+  moduleNavLinkWrap: { marginTop: 8, alignSelf: "flex-start" },
+  moduleNavLinkText: { fontSize: 14, color: "#d56c2f", fontWeight: "700", textDecorationLine: "underline" },
   userBubbleText: { color: "#fff" },
   // Input
   inputRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, gap: 8 },

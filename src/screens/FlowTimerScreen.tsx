@@ -20,6 +20,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import type { RootTabParamList } from "../navigation/types";
 import { AppBackground } from "../components/AppBackground";
+import { DefinitionInfoModal, definitionModalTextStyles } from "../components/DefinitionInfoModal";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { awardXp } from "../utils/gamification";
@@ -377,7 +378,7 @@ export default function FlowTimerScreen() {
       </View>
 
       <TouchableOpacity style={styles.flowTheoryBox} onPress={() => setShowFlowIntroModal(true)}>
-        <Text style={styles.flowTheoryTitle}>什麼是心流？（按此查看）</Text>
+        <Text style={styles.flowTheoryTitle}>甚麼是心流？（按此查看）</Text>
       </TouchableOpacity>
 
       <View style={styles.moduleTaskBlock}>
@@ -650,20 +651,20 @@ export default function FlowTimerScreen() {
           </View>
         </View>
       </Modal>
-      <Modal visible={showFlowIntroModal} transparent animationType="fade" onRequestClose={() => setShowFlowIntroModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>什麼是心流？</Text>
-            <Text style={styles.flowTheoryText}>
-              心流（flow）不是單純「專注」，而是全神貫注、行動與意識合一的最佳體驗狀態。心理學家 Csíkszentmihályi 指出：當<Text style={styles.flowTheoryBold}> 挑戰與技能平衡 </Text>、有<Text style={styles.flowTheoryBold}> 清晰目標 </Text>與<Text style={styles.flowTheoryBold}> 即時回饋 </Text>時，較容易進入心流——沉浸、忘我、內在獎勵。計時只是輔助；先選一項對你有適當難度的任務，再開始。
-            </Text>
-            <Text style={styles.flowTheoryLink}>出處：{FLOW_REFERENCE}</Text>
-            <TouchableOpacity style={[styles.button, styles.buttonSecondary, { marginTop: 14 }]} onPress={() => setShowFlowIntroModal(false)}>
-              <Text style={styles.buttonText}>關閉</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <DefinitionInfoModal
+        visible={showFlowIntroModal}
+        onRequestClose={() => setShowFlowIntroModal(false)}
+        title="甚麼是心流？"
+        citation={FLOW_REFERENCE}
+      >
+        <Text style={definitionModalTextStyles.body}>
+          心流（flow）不是單純「專注」，而是全神貫注、行動與意識合一的最佳體驗狀態。心理學家 Csíkszentmihályi 指出：當
+          <Text style={definitionModalTextStyles.bodyBold}>挑戰與技能平衡</Text>、有
+          <Text style={definitionModalTextStyles.bodyBold}>清晰目標</Text>與
+          <Text style={definitionModalTextStyles.bodyBold}>即時回饋</Text>
+          時，較容易進入心流——沉浸、忘我、內在獎勵。計時只是輔助；先選一項對你有適當難度的任務，再開始。
+        </Text>
+      </DefinitionInfoModal>
     </AppBackground>
   );
 }
@@ -721,9 +722,6 @@ const styles = StyleSheet.create({
     borderColor: "#bfdbfe"
   },
   flowTheoryTitle: { fontSize: 13, fontWeight: "700", color: "#1d4ed8", textAlign: "center" },
-  flowTheoryText: { fontSize: 13, color: "#374151", lineHeight: 20 },
-  flowTheoryBold: { fontWeight: "700", color: "#1e40af" },
-  flowTheoryLink: { fontSize: 11, color: "#64748b", marginTop: 8, fontStyle: "italic", lineHeight: 16 },
   // RPG Banner
   rpgBanner: {
     flexDirection: "row",
