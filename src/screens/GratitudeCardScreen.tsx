@@ -636,9 +636,9 @@ export default function GratitudeCardScreen() {
         <Text style={styles.infoTriggerText}>甚麼是感恩？（按此查看）</Text>
       </TouchableOpacity>
       <View style={styles.moduleTaskBlock}>
-        <Text style={styles.moduleTaskTitle}>呢個 Module 做咩？</Text>
+        <Text style={styles.moduleTaskTitle}>接住善意：多謝、報答或傳開去</Text>
         <Text style={styles.moduleTaskText}>
-          你可以用三種方式回應善意：{"\n"}
+          以下有三種回應善意嘅方向，唔使次次做齊，揀你想做、做得嘅一種（或幾種）就得：{"\n"}
           1) 寫感謝訊息，直接向對方表達謝意{"\n"}
           2) 默默報答同一個人，用行動回應佢對你嘅好{"\n"}
           3) 把善意傳揚開去，將呢份好意傳去下一個人{"\n\n"}
@@ -1162,8 +1162,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
-  /** 與上方「可修訂內文」輸入框分開少許 */
-  aiIllustrationBtn: { marginTop: 16, marginBottom: 6 },
+  /** 與上方「可修訂內文」輸入框之間距 */
+  aiIllustrationBtn: { marginTop: 12, marginBottom: 6 },
   btnDisabled: { opacity: 0.35 },
   generateBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, textAlign: "center" },
   switchBtn: {
@@ -1212,7 +1212,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 24,
     minHeight: 100,
-    backgroundColor: "#fefce8"
+    backgroundColor: "#fefce8",
+    marginBottom: 8
   },
   imageHint: { fontSize: 12, color: "#6b7280", marginBottom: 12 },
   // Save / Share

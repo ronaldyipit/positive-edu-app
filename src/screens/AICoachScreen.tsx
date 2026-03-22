@@ -11,10 +11,12 @@ import {
   StyleSheet,
   Animated,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Modal,
   Linking
 } from "react-native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { AppBackground } from "../components/AppBackground";
 import { DefinitionInfoModal } from "../components/DefinitionInfoModal";
@@ -232,6 +234,7 @@ const typingStyles = StyleSheet.create({
 export default function AICoachScreen() {
   const route = useRoute<RouteProp<RootTabParamList, "正向教練">>();
   const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
+  const tabBarHeight = useBottomTabBarHeight();
   const pendingFlowPrefillRef = useRef<string | null>(null);
   const [flowPrefillPending, setFlowPrefillPending] = useState(false);
 
@@ -297,6 +300,13 @@ export default function AICoachScreen() {
   const scrollToBottom = () => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   };
+
+  useEffect(() => {
+    if (screen !== "chat" || Platform.OS === "web") return;
+    const event = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const sub = Keyboard.addListener(event, () => scrollToBottom());
+    return () => sub.remove();
+  }, [screen]);
 
   const toggleStrength = (id: string) => {
     setSelectedStrengths((prev) =>
@@ -527,7 +537,7 @@ export default function AICoachScreen() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={80}
+      keyboardVerticalOffset={Platform.OS === "ios" ? tabBarHeight : 0}
     >
       {/* 頂部：已選優勢標籤 */}
       {selectedStrengths.length > 0 && (
@@ -567,6 +577,8 @@ export default function AICoachScreen() {
         ref={scrollRef}
         style={styles.chat}
         contentContainerStyle={styles.chatContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         onContentSizeChange={scrollToBottom}
       >
         {messages.map((m) => (
@@ -622,9 +634,25 @@ export default function AICoachScreen() {
             <View style={[styles.bubble, styles.coachBubble]}><TypingDots /></View>
           </View>
         )}
+
+        <View style={styles.chatFooterLegal}>
+          <Text style={styles.disclaimer}>本教練僅供教育用途，不能取代專業心理健康服務。</Text>
+          <Text style={styles.geelongRagChatNote}>
+            部分回覆或會參考從專書檢索的段落並改寫（僅在與正向教育／相關話題切合時；非逐字引用）。
+          </Text>
+          <Text style={styles.geelongRagChatCitation}>
+            <Text style={styles.citationLink} onPress={() => Linking.openURL(GEELONG_POSITIVE_EDUCATION_BOOK_URL)}>
+              Norrish & Seligman (2015)
+            </Text>
+            <Text style={styles.citationFooterDetail}>
+              {"\n"}
+              {NORRISH_SELIGMAN_2015_CITATION}
+            </Text>
+          </Text>
+        </View>
       </ScrollView>
 
-      {/* 輸入框 */}
+      {/* 輸入框（緊貼鍵盤上方；聲明與書目已置於上方對話捲動區底部） */}
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
@@ -632,8 +660,12 @@ export default function AICoachScreen() {
           placeholderTextColor="#9ca3af"
           value={input}
           onChangeText={setInput}
-          returnKeyType="send"
-          onSubmitEditing={() => handleSend()}
+          multiline
+          scrollEnabled
+          textAlignVertical="top"
+          returnKeyType="default"
+          blurOnSubmit={false}
+          onFocus={() => scrollToBottom()}
           editable={!loading}
         />
         <TouchableOpacity
@@ -644,19 +676,6 @@ export default function AICoachScreen() {
           <Text style={styles.sendText}>送出</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.disclaimer}>本教練僅供教育用途，不能取代專業心理健康服務。</Text>
-      <Text style={styles.geelongRagChatNote}>
-        部分回覆或會參考從專書檢索的段落並改寫（僅在與正向教育／相關話題切合時；非逐字引用）。
-      </Text>
-      <Text style={styles.geelongRagChatCitation}>
-        <Text style={styles.citationLink} onPress={() => Linking.openURL(GEELONG_POSITIVE_EDUCATION_BOOK_URL)}>
-          Norrish & Seligman (2015)
-        </Text>
-        <Text style={styles.citationFooterDetail}>
-          {"\n"}
-          {NORRISH_SELIGMAN_2015_CITATION}
-        </Text>
-      </Text>
     </KeyboardAvoidingView>
       </View>
     </View>
@@ -845,7 +864,14 @@ const styles = StyleSheet.create({
   moodLabel: { fontSize: 12, color: "#374151", fontWeight: "500", textAlign: "center" },
   // Chat
   chat: { flex: 1 },
-  chatContent: { padding: 12, gap: 4 },
+  chatContent: { padding: 12, gap: 4, paddingBottom: 20 },
+  chatFooterLegal: {
+    marginTop: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#e5e7eb"
+  },
   messageRow: { flexDirection: "row", alignItems: "flex-end", marginVertical: 3 },
   messageRowUser: { justifyContent: "flex-end" },
   messageRowCoach: { justifyContent: "flex-start" },
@@ -875,13 +901,31 @@ const styles = StyleSheet.create({
   },
   userBubbleText: { color: "#fff" },
   // Input
-  inputRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 10,
+    gap: 8,
+    backgroundColor: "#fff",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#e5e7eb"
+  },
   input: {
-    flex: 1, minHeight: 42,
-    borderWidth: 1, borderColor: "#d1d5db",
-    borderRadius: 21, paddingHorizontal: 14,
-    paddingVertical: 8, backgroundColor: "#fff",
-    fontSize: 14, color: "#111827"
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 120,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingTop: Platform.OS === "ios" ? 10 : 8,
+    paddingBottom: Platform.OS === "ios" ? 10 : 8,
+    backgroundColor: "#fff",
+    fontSize: 14,
+    color: "#111827",
+    lineHeight: 20
   },
   sendButton: {
     backgroundColor: "#d56c2f",

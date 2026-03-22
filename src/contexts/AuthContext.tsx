@@ -33,6 +33,12 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * 僅供本機／內部測試：設 EXPO_PUBLIC_SKIP_LOGIN_OTP=true 時，電郵密碼登入後不進入 OTP 步驟。
+ * 正式上架或遠端建置切勿啟用。
+ */
+const SKIP_LOGIN_OTP = process.env.EXPO_PUBLIC_SKIP_LOGIN_OTP === "true";
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,9 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!auth) throw new Error("Firebase Auth 未設定");
     setAuthError(null);
     try {
-      loginOtpFlagRef.current = true;
+      loginOtpFlagRef.current = !SKIP_LOGIN_OTP;
       await signInWithEmailAndPassword(auth, email, password);
-      setPendingOtp(true);
+      setPendingOtp(!SKIP_LOGIN_OTP);
     } catch (e: any) {
       loginOtpFlagRef.current = false;
       const code = e?.code || "";

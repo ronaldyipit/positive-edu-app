@@ -280,7 +280,8 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     alignItems: "center",
-    minHeight: 140,
+    width: "100%",
+    height: 182,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -314,7 +315,9 @@ const styles = StyleSheet.create({
     color: "#64748b",
     lineHeight: 15,
     textAlign: "center",
-    marginBottom: 6
+    marginBottom: 6,
+    minHeight: 45,
+    width: "100%"
   },
   chevronRow: {
     width: "100%",
