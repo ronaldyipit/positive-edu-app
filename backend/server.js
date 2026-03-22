@@ -304,6 +304,7 @@ app.post("/api/coach", async (req, res) => {
       "You do NOT diagnose, label, or give clinical or crisis advice. " +
       "You focus on PERMA Meaning: helping students find meaning, notice character strengths, and build resilience. " +
       "Keep a warm, hopeful, and non-judgmental tone. Aim for about 3–5 short sentences per reply when asking your one question (advice then question), unless a special rule below allows more. " +
+      "STRICT MODULE NAME: The shredder feature is **only** 「紓壓碎紙」（四字，**不要**加「機」）. Never write 「紓壓碎紙機」「抒壓碎紙機」as the feature or tab name; you may still describe actions (寫低、搖動、碎紙、呼吸) in plain words. " +
       "APP HELP EXCEPTION: If the user is clearly asking how the app works, where to find a feature, what a tab does, or how to get EXP, " +
       "answer factually using ONLY the guide below (do not invent features). Use up to 5 short sentences and no reflective coaching question. " +
       "If the guide does not cover their question, say honestly that you are unsure and suggest they open that tab or check on-screen hints. " +
@@ -321,7 +322,7 @@ app.post("/api/coach", async (req, res) => {
       "MODULE NAV TOKENS (the app turns these into tappable links; Traditional Chinese): Only these exact tokens exist—never invent others. " +
       "Each token must appear **alone on its own line** at the **very end** of your reply (after the reflective question when required). No punctuation on token lines. " +
       "Prefer **at most two** tokens per reply unless three clearly apply (rare). " +
-      "[[SHREDDER]] → 紓壓碎紙. [[FLOW]] → 離線深潛 (focus timer / flow). [[TORCH]] → 感恩 (bottom tab label 火炬傳暖; gratitude / kindness). " +
+      "[[SHREDDER]] → 紓壓碎紙 (never say 紓壓碎紙機). [[FLOW]] → 離線深潛 (focus timer / flow). [[TORCH]] → 感恩 (bottom tab label 火炬傳暖; gratitude / kindness). " +
       "Use [[FLOW]] when distraction, procrastination on a **concrete** task, wanting structured deep focus, or trouble sticking to one activity fits—say briefly **why** in normal text before the token line. " +
       "Use [[TORCH]] when gratitude, someone helped them, savouring good moments, or wanting to thank or pass kindness on fits—say briefly **why** before the token line. " +
       "WORRY + SHREDDER LINK: When the user clearly carries worry, rumination, stress, or a problem that cannot be fixed immediately, you may respond in Traditional Chinese (Cantonese-friendly when natural). " +
@@ -339,7 +340,8 @@ app.post("/api/coach", async (req, res) => {
       temperature: 0.6
     });
 
-    const reply = response.choices[0]?.message?.content || "";
+    let reply = response.choices[0]?.message?.content || "";
+    reply = reply.replace(/紓壓碎紙機/g, "紓壓碎紙").replace(/抒壓碎紙機/g, "紓壓碎紙");
     res.json({ reply });
   } catch (error) {
     console.error("Error in /api/coach:", error);
