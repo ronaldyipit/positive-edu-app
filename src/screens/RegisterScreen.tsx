@@ -16,6 +16,7 @@ import {
 import Constants from "expo-constants";
 import { useAuth } from "../contexts/AuthContext";
 import { AppBackground } from "../components/AppBackground";
+import { AUTH_EMAIL_OTP_ENABLED } from "../config/authOtp";
 import { Ionicons } from "@expo/vector-icons";
 
 const API_BASE =
@@ -24,9 +25,6 @@ const API_BASE =
   "https://positive-edu-app.vercel.app";
 
 const GRADES = ["中一", "中二", "中三", "中四", "中五", "中六"];
-
-/** 僅供本機／內部測試：註冊時略過電郵 OTP。正式環境切勿啟用。 */
-const SKIP_REGISTER_OTP = process.env.EXPO_PUBLIC_SKIP_REGISTER_OTP === "true";
 
 const PASSWORD_RULES = "密碼須至少 8 個字元，包含大寫字母 (A-Z)、小寫字母 (a-z)、數字 (0-9) 及特殊字符 (!@#$%^&*_+-)";
 
@@ -177,7 +175,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
     if (!school.trim()) { setLocalError("請輸入學校名稱。"); return; }
     if (!grade) { setLocalError("請選擇年級。"); return; }
     if (!email.trim()) { setLocalError("請輸入電子郵件。"); return; }
-    if (!SKIP_REGISTER_OTP && !otpVerified) { setLocalError("請先完成電郵驗證。"); return; }
+    if (AUTH_EMAIL_OTP_ENABLED && !otpVerified) { setLocalError("請先完成電郵驗證。"); return; }
     if (!password) { setLocalError("請輸入密碼。"); return; }
     const pwErr = validatePassword(password);
     if (pwErr) { setLocalError(pwErr); return; }
@@ -281,7 +279,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
               </TouchableOpacity>
             </Modal>
 
-            {SKIP_REGISTER_OTP ? (
+            {!AUTH_EMAIL_OTP_ENABLED ? (
               <>
                 <TextInput
                   style={styles.input}
@@ -295,7 +293,7 @@ export default function RegisterScreen({ navigation }: { navigation: { goBack: (
                 />
                 <View style={styles.devSkipOtpBanner}>
                   <Text style={styles.devSkipOtpText}>
-                    開發用：已啟用 EXPO_PUBLIC_SKIP_REGISTER_OTP，略過電郵驗證碼。請勿用於正式上架版本。
+                    目前暫停電郵驗證碼。要恢復時請將 src/config/authOtp.ts 的 AUTH_EMAIL_OTP_ENABLED 改為 true。
                   </Text>
                 </View>
               </>

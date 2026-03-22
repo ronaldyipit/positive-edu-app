@@ -15,6 +15,8 @@ import {
 import Constants from "expo-constants";
 import { Ionicons } from "@expo/vector-icons";
 import { AppBackground } from "../components/AppBackground";
+import { useAuth } from "../contexts/AuthContext";
+import { AUTH_EMAIL_OTP_ENABLED } from "../config/authOtp";
 
 const API_BASE =
   process.env.EXPO_PUBLIC_COACH_API_URL ||
@@ -37,6 +39,7 @@ export default function ForgotPasswordScreen({
 }: {
   navigation: { goBack: () => void };
 }) {
+  const { resetPassword } = useAuth();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -62,6 +65,27 @@ export default function ForgotPasswordScreen({
         return c - 1;
       });
     }, 1000);
+  };
+
+  /** OTP 關閉時：Firebase 官方重設密碼連結（唔經我哋嘅驗證碼 API） */
+  const handleFirebaseResetEmail = async () => {
+    setError(null);
+    const trimmed = email.trim();
+    if (!trimmed) { setError("請輸入電子郵件地址。"); return; }
+    if (!/\S+@\S+\.\S+/.test(trimmed)) { setError("請輸入有效的電子郵件地址。"); return; }
+    setLoading(true);
+    try {
+      await resetPassword(trimmed);
+      Alert.alert(
+        "已發送重設電郵",
+        "請打開信箱內的連結，依照 Firebase／Google 的畫面設定新密碼，然後返回此 App 登入。",
+        [{ text: "好", onPress: () => navigation.goBack() }]
+      );
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "發送失敗，請稍後再試。");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Step 1: Send OTP
@@ -164,6 +188,7 @@ export default function ForgotPasswordScreen({
   };
 
   const renderStepIndicator = () => {
+    if (!AUTH_EMAIL_OTP_ENABLED) return null;
     const steps = ["輸入電郵", "驗證碼", "新密碼"];
     const current = step === "email" ? 0 : step === "otp" ? 1 : 2;
     return (
@@ -203,8 +228,44 @@ export default function ForgotPasswordScreen({
           <Text style={styles.title}>重設密碼</Text>
           {renderStepIndicator()}
 
-          {/* Step 1: Email */}
-          {step === "email" && (
+          {/* OTP 關閉：只發 Firebase 重設連結 */}
+          {!AUTH_EMAIL_OTP_ENABLED && (
+            <>
+              <Text style={styles.hint}>
+                輸入註冊電郵，系統會透過 Firebase 發送「重設密碼」連結到你的信箱（目前暫停本 App 內的驗證碼步驟）。
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="電子郵件"
+                placeholderTextColor="#9ca3af"
+                value={email}
+                onChangeText={(t) => { setEmail(t); setError(null); }}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+                editable={!loading}
+                autoFocus
+              />
+              {error ? (
+                <View style={styles.errorBanner}>
+                  <Ionicons name="alert-circle" size={16} color="#dc2626" />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+              <TouchableOpacity
+                style={[styles.primaryButton, loading && styles.buttonDisabled]}
+                onPress={handleFirebaseResetEmail}
+                disabled={loading}
+              >
+                {loading ? <ActivityIndicator color="#fff" /> : (
+                  <Text style={styles.primaryButtonText}>發送重設密碼電郵</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* Step 1: Email（OTP 開啟時） */}
+          {AUTH_EMAIL_OTP_ENABLED && step === "email" && (
             <>
               <Text style={styles.hint}>輸入你的註冊電郵地址，我們會發送驗證碼。</Text>
               <TextInput
@@ -238,7 +299,7 @@ export default function ForgotPasswordScreen({
           )}
 
           {/* Step 2: OTP */}
-          {step === "otp" && (
+          {AUTH_EMAIL_OTP_ENABLED && step === "otp" && (
             <>
               <Text style={styles.hint}>驗證碼已發送至 {email.trim()}</Text>
               <TextInput
@@ -279,7 +340,7 @@ export default function ForgotPasswordScreen({
           )}
 
           {/* Step 3: New password */}
-          {step === "newPassword" && (
+          {AUTH_EMAIL_OTP_ENABLED && step === "newPassword" && (
             <>
               <View style={styles.verifiedBanner}>
                 <Ionicons name="checkmark-circle" size={16} color="#166534" />
