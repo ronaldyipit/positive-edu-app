@@ -503,6 +503,15 @@ export default function AICoachScreen() {
           {"\n"}
           <Text style={styles.citationFooterDetail}>{PETERSON_SELIGMAN_2004_CITATION}</Text>
         </Text>
+
+        <Text style={styles.geelongRagFooter}>
+          開始對話後，教練有時會按你的話題，參考從以下專書檢索並改寫的內容（非逐字引用）：{" "}
+          <Text style={styles.citationLink} onPress={() => Linking.openURL(GEELONG_POSITIVE_EDUCATION_BOOK_URL)}>
+            Norrish & Seligman (2015)
+          </Text>
+          {"\n"}
+          <Text style={styles.citationFooterDetail}>{NORRISH_SELIGMAN_2015_CITATION}</Text>
+        </Text>
       </ScrollView>
         </View>
       </View>
@@ -636,6 +645,18 @@ export default function AICoachScreen() {
         </TouchableOpacity>
       </View>
       <Text style={styles.disclaimer}>本教練僅供教育用途，不能取代專業心理健康服務。</Text>
+      <Text style={styles.geelongRagChatNote}>
+        部分回覆或會參考從專書檢索的段落並改寫（僅在與正向教育／相關話題切合時；非逐字引用）。
+      </Text>
+      <Text style={styles.geelongRagChatCitation}>
+        <Text style={styles.citationLink} onPress={() => Linking.openURL(GEELONG_POSITIVE_EDUCATION_BOOK_URL)}>
+          Norrish & Seligman (2015)
+        </Text>
+        <Text style={styles.citationFooterDetail}>
+          {"\n"}
+          {NORRISH_SELIGMAN_2015_CITATION}
+        </Text>
+      </Text>
     </KeyboardAvoidingView>
       </View>
     </View>
@@ -739,6 +760,29 @@ const styles = StyleSheet.create({
   citationFooter: { fontSize: 11, color: "#9ca3af", marginTop: 16, marginBottom: 8 },
   citationFooterDetail: { fontSize: 10, color: "#9ca3af", marginTop: 6, lineHeight: 15 },
   citationLink: { color: "#d56c2f", textDecorationLine: "underline" },
+  geelongRagFooter: {
+    fontSize: 11,
+    color: "#9ca3af",
+    marginTop: 4,
+    marginBottom: 8,
+    lineHeight: 16
+  },
+  geelongRagChatNote: {
+    fontSize: 10,
+    color: "#9ca3af",
+    textAlign: "center",
+    marginTop: 4,
+    paddingHorizontal: 12,
+    lineHeight: 15
+  },
+  geelongRagChatCitation: {
+    fontSize: 11,
+    color: "#9ca3af",
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: 6,
+    paddingHorizontal: 12
+  },
   virtueSection: { marginBottom: 18 },
   virtueTitle: { fontSize: 14, fontWeight: "700", color: "#374151", marginBottom: 8 },
   startBtn: {
@@ -849,5 +893,5 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: { opacity: 0.4 },
   sendText: { color: "#fff", fontWeight: "700", textAlign: "center" },
-  disclaimer: { fontSize: 11, color: "#9ca3af", textAlign: "center", paddingBottom: 8 }
+  disclaimer: { fontSize: 11, color: "#9ca3af", textAlign: "center", paddingBottom: 4 }
 });
