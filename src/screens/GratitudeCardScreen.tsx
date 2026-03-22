@@ -15,6 +15,7 @@ import {
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as IntentLauncher from "expo-intent-launcher";
+import { Audio } from "expo-av";
 import { AppBackground } from "../components/AppBackground";
 import { DefinitionInfoModal } from "../components/DefinitionInfoModal";
 import * as MediaLibrary from "expo-media-library";
@@ -23,6 +24,8 @@ import { awardXp } from "../utils/gamification";
 
 const COACH_API_BASE = process.env.EXPO_PUBLIC_COACH_API_URL || "https://positive-edu-app.vercel.app";
 const TASKS_PER_PAGE = 5;
+/** 「任務完成」覆蓋層與火焰音效時長（毫秒） */
+const COMPLETE_RELAY_SOUND_MS = 3000;
 
 /** 感恩之操作型定義概括自 Emmons 對感恩情緒與傾向之論述（正向心理學常用架構） */
 const GRATITUDE_CITATION =
@@ -109,7 +112,49 @@ export default function GratitudeCardScreen() {
   const completeRightGlow = useRef(new Animated.Value(0)).current;
   const completeOverlayOpacity = useRef(new Animated.Value(0)).current;
   const completingRef = useRef(false);
+  const completeFireSoundRef = useRef<Audio.Sound | null>(null);
+  const fireSoundStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const theme = THEMES[themeIdx];
+
+  useEffect(() => {
+    let mounted = true;
+    Audio.Sound.createAsync(require("../../assets/sound/fire.mp3"))
+      .then(({ sound }) => {
+        if (mounted) completeFireSoundRef.current = sound;
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+      if (fireSoundStopTimerRef.current) {
+        clearTimeout(fireSoundStopTimerRef.current);
+        fireSoundStopTimerRef.current = null;
+      }
+      completeFireSoundRef.current?.unloadAsync();
+    };
+  }, []);
+
+  const playCompleteFireSound = async () => {
+    if (fireSoundStopTimerRef.current) {
+      clearTimeout(fireSoundStopTimerRef.current);
+      fireSoundStopTimerRef.current = null;
+    }
+    try {
+      const s = completeFireSoundRef.current;
+      if (!s) return;
+      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+      await s.stopAsync().catch(() => {});
+      await s.setPositionAsync(0);
+      await s.playAsync();
+      fireSoundStopTimerRef.current = setTimeout(() => {
+        fireSoundStopTimerRef.current = null;
+        s.stopAsync()
+          .then(() => s.setPositionAsync(0))
+          .catch(() => {});
+      }, COMPLETE_RELAY_SOUND_MS);
+    } catch {
+      /* ignore */
+    }
+  };
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -292,9 +337,12 @@ export default function GratitudeCardScreen() {
     if (completingRef.current) return;
     completingRef.current = true;
     setShowCompleteRelay(true);
+    void playCompleteFireSound();
     completeTravel.setValue(0);
     completeRightGlow.setValue(0);
     completeOverlayOpacity.setValue(0);
+    // 覆蓋層總時長 ≈ COMPLETE_RELAY_SOUND_MS（160 + 850 + delay + 250）
+    const postFlameDelay = Math.max(0, COMPLETE_RELAY_SOUND_MS - 160 - 850 - 250);
     Animated.sequence([
       Animated.timing(completeOverlayOpacity, { toValue: 1, duration: 160, useNativeDriver: true }),
       Animated.parallel([
@@ -304,7 +352,7 @@ export default function GratitudeCardScreen() {
           Animated.timing(completeRightGlow, { toValue: 1, duration: 180, useNativeDriver: true })
         ])
       ]),
-      Animated.delay(460),
+      Animated.delay(postFlameDelay),
       Animated.timing(completeOverlayOpacity, { toValue: 0, duration: 250, useNativeDriver: true })
     ]).start(() => {
       completingRef.current = false;
