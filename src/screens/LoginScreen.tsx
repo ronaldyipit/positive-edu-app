@@ -400,9 +400,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: 4
   },
-  primaryButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  primaryButtonText: { color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" },
   buttonDisabled: { opacity: 0.6 },
   resendButton: {
     borderWidth: 1.5,
@@ -410,13 +411,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: 12
   },
-  resendText: { color: "#d56c2f", fontSize: 14, fontWeight: "600" },
+  resendText: { color: "#d56c2f", fontSize: 14, fontWeight: "600", textAlign: "center" },
   forgotLink: { alignSelf: "flex-end", marginBottom: 12, paddingVertical: 2 },
-  forgotText: { color: "#d56c2f", fontSize: 13 },
+  forgotText: { color: "#d56c2f", fontSize: 13, textAlign: "center" },
   link: { marginTop: 16, alignItems: "center" },
-  linkText: { color: "#d56c2f", fontSize: 14 },
+  linkText: { color: "#d56c2f", fontSize: 14, textAlign: "center" },
   configWarning: {
     backgroundColor: "#fef3c7",
     borderRadius: 12,

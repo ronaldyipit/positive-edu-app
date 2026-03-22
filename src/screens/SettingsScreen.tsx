@@ -121,8 +121,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#d56c2f",
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 12
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center"
   },
-  logoutText: { color: "#fff", fontWeight: "600" },
+  logoutText: { color: "#fff", fontWeight: "600", textAlign: "center" },
   footer: { marginTop: 32, fontSize: 12, color: "#78716c" }
 });

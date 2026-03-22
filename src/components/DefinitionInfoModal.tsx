@@ -92,11 +92,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 999,
     minWidth: 120,
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "center"
   },
   closeBtnText: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 16
+    fontSize: 16,
+    textAlign: "center"
   }
 });

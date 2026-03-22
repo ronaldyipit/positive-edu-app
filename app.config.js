@@ -16,7 +16,16 @@ module.exports = {
       // 強制使用 Hermes，避免向 JitPack 拉 jsc-android（Read timed out）
       jsEngine: "hermes"
     },
-    plugins: [],
+    plugins: [
+      [
+        "expo-media-library",
+        {
+          photosPermission: "「正發光」需要存取你的相簿，以便儲存感恩卡圖片。",
+          savePhotosPermission: "「正發光」需要將感恩卡圖片儲存至你的相簿。",
+          granularPermissions: ["photo"]
+        }
+      ]
+    ],
     web: { bundler: "metro", output: "single" },
     extra: {
       eas: {

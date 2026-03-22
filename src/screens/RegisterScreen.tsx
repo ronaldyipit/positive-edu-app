@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     minWidth: 90
   },
   sendOtpButtonDisabled: { opacity: 0.55 },
-  sendOtpText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  sendOtpText: { color: "#fff", fontSize: 13, fontWeight: "600", textAlign: "center" },
   // otp row
   otpRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   otpInput: { flex: 1, letterSpacing: 4, fontSize: 18 },
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center"
   },
-  verifyOtpText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  verifyOtpText: { color: "#fff", fontSize: 14, fontWeight: "600", textAlign: "center" },
   verifiedBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -473,8 +473,13 @@ const styles = StyleSheet.create({
     borderColor: "#22c55e"
   },
   verifiedText: { color: "#166534", fontSize: 13, fontWeight: "600", flex: 1 },
-  resetEmailButton: { paddingHorizontal: 8, paddingVertical: 2 },
-  resetEmailText: { color: "#d56c2f", fontSize: 13, fontWeight: "600" },
+  resetEmailButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  resetEmailText: { color: "#d56c2f", fontSize: 13, fontWeight: "600", textAlign: "center" },
   passwordHint: { fontSize: 11, color: "#9ca3af", marginTop: -8, marginBottom: 12, paddingHorizontal: 4, lineHeight: 16 },
   error: { color: "#dc2626", fontSize: 13, marginBottom: 8 },
   errorBanner: {
@@ -495,12 +500,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",
+    justifyContent: "center",
     marginTop: 8
   },
   buttonDisabled: { opacity: 0.7 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" },
   link: { marginTop: 16, alignItems: "center" },
-  linkText: { color: "#d56c2f", fontSize: 14 },
+  linkText: { color: "#d56c2f", fontSize: 14, textAlign: "center" },
   // grade dropdown
   dropdown: {
     flexDirection: "row",
@@ -541,7 +547,7 @@ const styles = StyleSheet.create({
     borderColor: "#22c55e",
     alignItems: "center"
   },
-  successText: { fontSize: 15, fontWeight: "600", color: "#166534" },
+  successText: { fontSize: 15, fontWeight: "600", color: "#166534", textAlign: "center" },
   configWarning: {
     backgroundColor: "#fef3c7",
     borderRadius: 12,

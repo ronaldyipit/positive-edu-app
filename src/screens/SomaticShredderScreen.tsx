@@ -488,7 +488,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    marginBottom: 14
+    marginBottom: 14,
+    alignItems: "center",
+    justifyContent: "center"
   },
   mindTheoryTitle: { fontSize: 13, fontWeight: "700", color: "#1d4ed8", textAlign: "center" },
   moduleTaskBlock: { marginBottom: 14 },
@@ -512,10 +514,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 999,
-    alignSelf: "center"
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center"
   },
   btnDisabled: { opacity: 0.35 },
-  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  primaryBtnText: { color: "#fff", fontWeight: "700", fontSize: 16, textAlign: "center" },
   pauseBtn: { marginTop: 12 },
   // Shake step
   shakeSection: { alignItems: "center", paddingVertical: 8 },
@@ -610,7 +614,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#d56c2f",
     paddingHorizontal: 28,
     paddingVertical: 12,
-    borderRadius: 999
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center"
   },
-  resetBtnText: { color: "#fff", fontWeight: "600", fontSize: 15 }
+  resetBtnText: { color: "#fff", fontWeight: "600", fontSize: 15, textAlign: "center" }
 });

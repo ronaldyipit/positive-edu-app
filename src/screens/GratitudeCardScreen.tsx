@@ -10,8 +10,11 @@ import {
   Platform,
   Image,
   Animated,
-  Linking
+  Linking,
+  Keyboard,
+  InteractionManager
 } from "react-native";
+import { copyAsync, cacheDirectory } from "expo-file-system/legacy";
 import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as IntentLauncher from "expo-intent-launcher";
@@ -497,6 +500,39 @@ export default function GratitudeCardScreen() {
     }
   };
 
+  /** MediaLibrary 需要帶副檔名的本機路徑（部分 Android 截圖檔名無 .png） */
+  const ensurePngFileUri = async (uri: string): Promise<string> => {
+    const pathPart = uri.split("?")[0] ?? uri;
+    if (/\.png$/i.test(pathPart)) return uri;
+    if (!cacheDirectory) return uri;
+    const dest = `${cacheDirectory}torch-gratitude-${Date.now()}.png`;
+    await copyAsync({ from: uri, to: dest });
+    return dest;
+  };
+
+  const captureCardForExport = async (): Promise<string | null> => {
+    Keyboard.dismiss();
+    await new Promise<void>((resolve) => {
+      InteractionManager.runAfterInteractions(() => resolve());
+    });
+    await new Promise((r) => setTimeout(r, Platform.OS === "android" ? 150 : 80));
+    const raw = await captureCard();
+    if (!raw) return null;
+    try {
+      return await ensurePngFileUri(raw);
+    } catch {
+      return raw;
+    }
+  };
+
+  const requestMediaSavePermission = async (): Promise<boolean> => {
+    let { status } = await MediaLibrary.requestPermissionsAsync(true);
+    if (status !== "granted") {
+      ({ status } = await MediaLibrary.requestPermissionsAsync(false));
+    }
+    return status === "granted";
+  };
+
   const handleSaveToGallery = async () => {
     if (Platform.OS === "web") {
       Alert.alert("提示", "網頁版請使用「分享」功能或長按圖片儲存。");
@@ -504,12 +540,12 @@ export default function GratitudeCardScreen() {
     }
     setSaving(true);
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== "granted") {
+      const ok = await requestMediaSavePermission();
+      if (!ok) {
         Alert.alert("需要權限", "請允許存取相簿以儲存卡片圖片。");
         return;
       }
-      const uri = await captureCard();
+      const uri = await captureCardForExport();
       if (!uri) throw new Error("截圖失敗");
       // 先用 saveToLibrary；若裝置不支援則 fallback 到 createAsset
       try {
@@ -529,7 +565,7 @@ export default function GratitudeCardScreen() {
   const handleShare = async () => {
     setSaving(true);
     try {
-      const uri = await captureCard();
+      const uri = await captureCardForExport();
       if (!uri) throw new Error("截圖失敗");
       if (Platform.OS === "web") {
         Alert.alert("提示", "網頁版暫不支援分享，請長按圖片儲存。");
@@ -584,7 +620,6 @@ export default function GratitudeCardScreen() {
       <View style={styles.whiteCard}>
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <Text style={styles.title}>火炬傳暖</Text>
-      <Text style={styles.subtitle}>唔使長篇，一句都可以傳暖。你可揀：直接答謝、默默回應，或把善意傳落去。</Text>
       <View style={styles.expHintBox}>
         <Text style={styles.expHintTitle}>EXP 獎勵</Text>
         <Text style={styles.expHintItem}>✉️ 寫感謝訊息（成功傳送） +20</Text>
@@ -783,7 +818,11 @@ export default function GratitudeCardScreen() {
         <>
           <ViewShot
             ref={viewShotRef}
-            options={{ format: "png", quality: 1.0 }}
+            options={{
+              format: "png",
+              quality: 1.0,
+              ...(Platform.OS === "android" ? { fileName: "torch-gratitude-card.png" } : {})
+            }}
             style={[styles.card, { backgroundColor: theme.bg, borderColor: theme.border }]}
           >
             {aiImageUrl ? (
@@ -817,7 +856,11 @@ export default function GratitudeCardScreen() {
             <>
               {/* AI 插圖：無圖時顯示「AI 插圖（選填）」，有圖時顯示「重新生成插圖」 */}
               <TouchableOpacity
-                style={[styles.generateBtnAi, { marginBottom: 4 }, (!recipient.trim() || !keyword.trim() || loadingImage) && styles.btnDisabled]}
+                style={[
+                  styles.generateBtnAi,
+                  styles.aiIllustrationBtn,
+                  (!recipient.trim() || !keyword.trim() || loadingImage) && styles.btnDisabled
+                ]}
                 onPress={handleGenerateAiImage}
                 disabled={!recipient.trim() || !keyword.trim() || loadingImage}
               >
@@ -981,8 +1024,7 @@ const styles = StyleSheet.create({
   },
   scroll: { flex: 1 },
   container: { padding: 16, paddingBottom: 40 },
-  title: { fontSize: 22, fontWeight: "700", marginBottom: 4, color: "#111827" },
-  subtitle: { fontSize: 13, color: "#4b5563", marginBottom: 14 },
+  title: { fontSize: 22, fontWeight: "700", marginBottom: 14, color: "#111827" },
   expHintBox: {
     backgroundColor: "#eff6ff",
     borderWidth: 1,
@@ -1009,7 +1051,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    marginBottom: 14
+    marginBottom: 14,
+    alignItems: "center",
+    justifyContent: "center"
   },
   infoTriggerText: { fontSize: 13, color: "#1d4ed8", fontWeight: "700", textAlign: "center" },
   moduleTaskBlock: { marginBottom: 14 },
@@ -1041,13 +1085,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 10
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center"
   },
   modeBtnActive: {
     borderColor: "#d56c2f",
     backgroundColor: "#fff7ed"
   },
-  modeBtnText: { fontSize: 13, color: "#4b5563", fontWeight: "600" },
+  modeBtnText: { fontSize: 13, color: "#4b5563", fontWeight: "600", textAlign: "center" },
   modeBtnTextActive: { color: "#b45309" },
   editingBanner: {
     marginBottom: 10,
@@ -1062,17 +1108,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   editingBannerText: { fontSize: 12, color: "#9a3412", fontWeight: "700" },
-  editingCancelText: { fontSize: 12, color: "#b45309", fontWeight: "700" },
+  editingCancelText: { fontSize: 12, color: "#b45309", fontWeight: "700", textAlign: "center" },
   promptBox: {
     backgroundColor: "#fffbeb",
     borderRadius: 12,
     padding: 12,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#fde68a"
+    borderColor: "#fde68a",
+    alignItems: "center"
   },
-  promptLabel: { fontSize: 11, color: "#b45309", fontWeight: "600", marginBottom: 4 },
-  promptText: { fontSize: 14, color: "#92400e" },
+  promptLabel: { fontSize: 11, color: "#b45309", fontWeight: "600", marginBottom: 4, textAlign: "center", alignSelf: "stretch" },
+  promptText: { fontSize: 14, color: "#92400e", textAlign: "center" },
   input: {
     borderWidth: 1,
     borderColor: "#fde68a",
@@ -1093,33 +1140,42 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 4
   },
   themeBtnActive: { borderWidth: 3 },
-  themeName: { fontSize: 13, fontWeight: "600" },
+  themeName: { fontSize: 13, fontWeight: "600", textAlign: "center" },
   actionRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" },
   generateBtn: {
     backgroundColor: "#d56c2f",
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 999
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center"
   },
   generateBtnAi: {
     backgroundColor: "#d56c2f",
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 999
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center"
   },
+  /** 與上方「可修訂內文」輸入框分開少許 */
+  aiIllustrationBtn: { marginTop: 16, marginBottom: 6 },
   btnDisabled: { opacity: 0.35 },
-  generateBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  generateBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, textAlign: "center" },
   switchBtn: {
     borderWidth: 1.5,
     borderColor: "#d56c2f",
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 999
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center"
   },
-  switchBtnText: { color: "#d56c2f", fontWeight: "600", fontSize: 14 },
+  switchBtnText: { color: "#d56c2f", fontWeight: "600", fontSize: 14, textAlign: "center" },
   // Card (ViewShot area)
   card: {
     borderRadius: 20,
@@ -1165,18 +1221,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 13,
     borderRadius: 12,
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "center"
   },
-  saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, textAlign: "center" },
   shareBtn: {
     flex: 1,
     paddingVertical: 13,
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
     backgroundColor: "#fff"
   },
-  shareBtnText: { fontWeight: "700", fontSize: 15 },
+  shareBtnText: { fontWeight: "700", fontSize: 15, textAlign: "center" },
   hintText: { fontSize: 12, color: "#9ca3af", textAlign: "center" }
   ,
   logBox: {
@@ -1214,10 +1272,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: "#fff7ed",
     borderWidth: 1,
-    borderColor: "#fed7aa"
+    borderColor: "#fed7aa",
+    alignItems: "center",
+    justifyContent: "center"
   },
   pageBtnDisabled: { opacity: 0.45 },
-  pageBtnText: { fontSize: 12, fontWeight: "700", color: "#9a3412" },
+  pageBtnText: { fontSize: 12, fontWeight: "700", color: "#9a3412", textAlign: "center" },
   pageInfo: { fontSize: 12, color: "#6b7280", fontWeight: "600" },
   logActionCol: { marginLeft: 10, gap: 8 },
   editBtn: {
@@ -1226,27 +1286,33 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    borderRadius: 999
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center"
   },
-  editBtnText: { fontSize: 12, color: "#1d4ed8", fontWeight: "800" },
+  editBtnText: { fontSize: 12, color: "#1d4ed8", fontWeight: "800", textAlign: "center" },
   statusChip: {
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderWidth: 1
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center"
   },
   statusChipPending: { backgroundColor: "#fff7ed", borderColor: "#fdba74" },
   statusChipDone: { backgroundColor: "#ecfdf5", borderColor: "#86efac" },
-  statusChipText: { fontSize: 11, fontWeight: "700" },
+  statusChipText: { fontSize: 11, fontWeight: "700", textAlign: "center" },
   statusChipTextPending: { color: "#9a3412" },
   statusChipTextDone: { color: "#166534" },
   doneBtn: {
     backgroundColor: "#2563eb",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 999
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center"
   },
-  doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  doneBtnText: { color: "#fff", fontWeight: "700", fontSize: 12, textAlign: "center" },
   completeOverlay: {
     position: "absolute",
     top: 0,

@@ -391,18 +391,27 @@ const styles = StyleSheet.create({
   },
   verifiedText: { color: "#166534", fontSize: 13, fontWeight: "600" },
   primaryButton: {
-    backgroundColor: "#d56c2f", borderRadius: 12,
-    paddingVertical: 14, alignItems: "center", marginTop: 4
+    backgroundColor: "#d56c2f",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4
   },
-  primaryButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  primaryButtonText: { color: "#fff", fontSize: 16, fontWeight: "600", textAlign: "center" },
   secondaryButton: {
-    borderWidth: 1.5, borderColor: "#fde68a", borderRadius: 12,
-    paddingVertical: 12, alignItems: "center", marginTop: 4
+    borderWidth: 1.5,
+    borderColor: "#fde68a",
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4
   },
-  secondaryButtonText: { color: "#d56c2f", fontSize: 14, fontWeight: "600" },
+  secondaryButtonText: { color: "#d56c2f", fontSize: 14, fontWeight: "600", textAlign: "center" },
   buttonDisabled: { opacity: 0.6 },
   textLink: { marginTop: 10, alignItems: "center" },
-  textLinkText: { color: "#d56c2f", fontSize: 13 },
+  textLinkText: { color: "#d56c2f", fontSize: 13, textAlign: "center" },
   backLink: { marginTop: 18, alignItems: "center" },
-  backLinkText: { color: "#d56c2f", fontSize: 14 }
+  backLinkText: { color: "#d56c2f", fontSize: 14, textAlign: "center" }
 });

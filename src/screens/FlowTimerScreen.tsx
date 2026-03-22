@@ -719,7 +719,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#bfdbfe"
+    borderColor: "#bfdbfe",
+    alignItems: "center",
+    justifyContent: "center"
   },
   flowTheoryTitle: { fontSize: 13, fontWeight: "700", color: "#1d4ed8", textAlign: "center" },
   // RPG Banner
@@ -763,10 +765,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1.5,
     borderColor: "#d1d5db",
-    backgroundColor: "#fff"
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center"
   },
   difficultyBtnActive: { borderColor: "#2563eb", backgroundColor: "#eff6ff" },
-  difficultyBtnText: { fontSize: 13, color: "#6b7280", fontWeight: "600" },
+  difficultyBtnText: { fontSize: 13, color: "#6b7280", fontWeight: "600", textAlign: "center" },
   difficultyBtnTextActive: { color: "#2563eb" },
   difficultyHint: { fontSize: 11, color: "#2563eb", marginTop: 6 },
   durationSection: {
@@ -803,11 +807,13 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1.5,
     borderColor: "#d1d5db",
-    backgroundColor: "#fff"
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center"
   },
   durationBtnActive: { borderColor: "#d56c2f", backgroundColor: "#fff7ed" },
   durationBtnDisabled: { opacity: 0.4 },
-  durationText: { fontSize: 14, color: "#6b7280", fontWeight: "600" },
+  durationText: { fontSize: 14, color: "#6b7280", fontWeight: "600", textAlign: "center" },
   durationTextActive: { color: "#d56c2f" },
   customDurationRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 12, gap: 8 },
   customDurationLabel: { fontSize: 14, color: "#6b7280", fontWeight: "600" },
@@ -847,14 +853,20 @@ const styles = StyleSheet.create({
   celebrateAi: { fontSize: 12, color: "#92400e", marginTop: 6, fontStyle: "italic" },
   // Buttons
   buttonsRow: { flexDirection: "row", justifyContent: "center", marginBottom: 16, gap: 12 },
-  button: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 999 },
+  button: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   buttonStart: { backgroundColor: "#d56c2f" },
   buttonPause: { backgroundColor: "#f97316" },
   buttonSecondary: { backgroundColor: "#6b7280" },
   buttonExit: { backgroundColor: "#374151", minWidth: 140 },
   exitLongPressBg: { position: "absolute", left: 8, right: 8, bottom: 4, height: 4, backgroundColor: "rgba(255,255,255,0.3)", borderRadius: 2, overflow: "hidden" },
   exitLongPressFill: { height: "100%", backgroundColor: "#fff", borderRadius: 2 },
-  buttonText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  buttonText: { color: "#fff", fontWeight: "700", fontSize: 15, textAlign: "center" },
   // Stats
   statsBox: {
     padding: 16, borderRadius: 16, backgroundColor: "#fff",
@@ -891,8 +903,17 @@ const styles = StyleSheet.create({
   modalCard: { backgroundColor: "#fff", borderRadius: 20, padding: 24, width: "100%", maxWidth: 360 },
   modalTitle: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 16, textAlign: "center" },
   timeGuessRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 10 },
-  timeGuessBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, backgroundColor: "#eff6ff", borderWidth: 1.5, borderColor: "#bfdbfe" },
-  timeGuessBtnText: { fontSize: 15, fontWeight: "600", color: "#2563eb" },
+  timeGuessBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: "#eff6ff",
+    borderWidth: 1.5,
+    borderColor: "#bfdbfe",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  timeGuessBtnText: { fontSize: 15, fontWeight: "600", color: "#2563eb", textAlign: "center" },
   revealText: { fontSize: 15, color: "#374151", marginBottom: 4 },
   revealHintWrap: { minHeight: 48, marginTop: 10, marginBottom: 12, justifyContent: "center" },
   revealHint: { fontSize: 14, color: "#1e40af", fontWeight: "600", lineHeight: 21 },

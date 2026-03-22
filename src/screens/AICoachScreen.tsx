@@ -22,9 +22,16 @@ import { DefinitionInfoModal } from "../components/DefinitionInfoModal";
 const STRENGTH_CITATION_URL =
   "https://global.oup.com/academic/product/character-strengths-and-virtues-9780195167016";
 
+const GEELONG_POSITIVE_EDUCATION_BOOK_URL =
+  "https://global.oup.com/academic/product/positive-education-9780198702580";
+
 /** 完整出處（性格優勢分類與定義） */
 const PETERSON_SELIGMAN_2004_CITATION =
   "Peterson, C., & Seligman, M. E. P. (2004). Character strengths and virtues: A handbook and classification. New York: Oxford University Press and Washington, DC: American Psychological Association.";
+
+/** 後端 RAG 檢索來源之一；教練回覆或會在相關話題下改述書中觀點（非逐字引用） */
+const NORRISH_SELIGMAN_2015_CITATION =
+  "Norrish, J. M., & Seligman, M. E. (2015). Positive education: The Geelong grammar school journey. Oxford University Press.";
 
 /** 與主頁模組、離線深潛等一致：單行標題（底部 Tab 仍為「正向教練」） */
 const COACH_MODULE_TITLE = "正向教練 (AI聊天機器人)";
@@ -682,7 +689,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    marginBottom: 14
+    marginBottom: 14,
+    alignItems: "center",
+    justifyContent: "center"
   },
   infoTriggerText: { fontSize: 13, color: "#1d4ed8", fontWeight: "700", textAlign: "center" },
   selectHeading: { fontSize: 18, fontWeight: "700", color: "#111827", marginBottom: 6 },
@@ -736,10 +745,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#d56c2f",
     paddingVertical: 14,
     borderRadius: 14,
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "center"
   },
   startBtnDisabled: { backgroundColor: "#fdba74", opacity: 0.9 },
-  startBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  startBtnText: { color: "#fff", fontWeight: "700", fontSize: 16, textAlign: "center" },
   // Chat screen top bar
   strengthsBar: {
     flexDirection: "row",
@@ -759,8 +769,14 @@ const styles = StyleSheet.create({
     borderRadius: 999
   },
   strengthTagText: { fontSize: 12, color: "#b45309", fontWeight: "600" },
-  editStrengthsBtn: { marginLeft: "auto" },
-  editStrengthsBtnText: { fontSize: 12, color: "#d56c2f", fontWeight: "600" },
+  editStrengthsBtn: {
+    marginLeft: "auto",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  editStrengthsBtnText: { fontSize: 12, color: "#d56c2f", fontWeight: "600", textAlign: "center" },
   // Mood buttons
   moodRow: {
     flexDirection: "row",
@@ -778,10 +794,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 4
   },
   moodEmoji: { fontSize: 16 },
-  moodLabel: { fontSize: 12, color: "#374151", fontWeight: "500" },
+  moodLabel: { fontSize: 12, color: "#374151", fontWeight: "500", textAlign: "center" },
   // Chat
   chat: { flex: 1 },
   chatContent: { padding: 12, gap: 4 },
@@ -804,8 +821,14 @@ const styles = StyleSheet.create({
   },
   bubbleText: { fontSize: 14, color: "#111827", lineHeight: 20 },
   bubbleTextBold: { fontWeight: "700" },
-  moduleNavLinkWrap: { marginTop: 8, alignSelf: "flex-start" },
-  moduleNavLinkText: { fontSize: 14, color: "#d56c2f", fontWeight: "700", textDecorationLine: "underline" },
+  moduleNavLinkWrap: { marginTop: 8, alignSelf: "stretch", alignItems: "center" },
+  moduleNavLinkText: {
+    fontSize: 14,
+    color: "#d56c2f",
+    fontWeight: "700",
+    textDecorationLine: "underline",
+    textAlign: "center"
+  },
   userBubbleText: { color: "#fff" },
   // Input
   inputRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
@@ -816,8 +839,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8, backgroundColor: "#fff",
     fontSize: 14, color: "#111827"
   },
-  sendButton: { backgroundColor: "#d56c2f", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 21 },
+  sendButton: {
+    backgroundColor: "#d56c2f",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   sendButtonDisabled: { opacity: 0.4 },
-  sendText: { color: "#fff", fontWeight: "700" },
+  sendText: { color: "#fff", fontWeight: "700", textAlign: "center" },
   disclaimer: { fontSize: 11, color: "#9ca3af", textAlign: "center", paddingBottom: 8 }
 });
