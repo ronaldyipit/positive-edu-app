@@ -6,6 +6,11 @@ module.exports = {
     name: "正發光",
     slug: "positive-edu-app",
     version: "1.0.0",
+    /** EAS Update：與已安裝二進位嘅 `expo.version`（App 版本）一致先會收到 OTA */
+    runtimeVersion: { policy: "appVersion" },
+    updates: {
+      url: "https://u.expo.dev/2d7873c8-7bb2-48dd-9c7a-6e75d55f2c98"
+    },
     orientation: "portrait",
     scheme: "com.positiveedu.companion",
     userInterfaceStyle: "light",
@@ -23,6 +28,7 @@ module.exports = {
       }
     },
     plugins: [
+      "expo-updates",
       [
         "expo-media-library",
         {
