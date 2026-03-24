@@ -21,7 +21,6 @@ import * as IntentLauncher from "expo-intent-launcher";
 import { Audio } from "expo-av";
 import { AppBackground } from "../components/AppBackground";
 import { DefinitionInfoModal } from "../components/DefinitionInfoModal";
-import * as MediaLibrary from "expo-media-library";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { awardXp } from "../utils/gamification";
 
@@ -525,43 +524,6 @@ export default function GratitudeCardScreen() {
     }
   };
 
-  const requestMediaSavePermission = async (): Promise<boolean> => {
-    let { status } = await MediaLibrary.requestPermissionsAsync(true);
-    if (status !== "granted") {
-      ({ status } = await MediaLibrary.requestPermissionsAsync(false));
-    }
-    return status === "granted";
-  };
-
-  const handleSaveToGallery = async () => {
-    if (Platform.OS === "web") {
-      Alert.alert("提示", "網頁版請使用「分享」功能或長按圖片儲存。");
-      return;
-    }
-    setSaving(true);
-    try {
-      const ok = await requestMediaSavePermission();
-      if (!ok) {
-        Alert.alert("需要權限", "請允許存取相簿以儲存卡片圖片。");
-        return;
-      }
-      const uri = await captureCardForExport();
-      if (!uri) throw new Error("截圖失敗");
-      // 先用 saveToLibrary；若裝置不支援則 fallback 到 createAsset
-      try {
-        await MediaLibrary.saveToLibraryAsync(uri);
-      } catch {
-        const asset = await MediaLibrary.createAssetAsync(uri);
-        await MediaLibrary.createAlbumAsync("正發光", asset, false).catch(() => {});
-      }
-      Alert.alert("已儲存 📸", "火炬傳暖卡已儲存到你的相簿。");
-    } catch (e) {
-      Alert.alert("儲存失敗", "未能儲存到相簿，請檢查相簿權限後再試。");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleShare = async () => {
     setSaving(true);
     try {
@@ -876,13 +838,6 @@ export default function GratitudeCardScreen() {
           {mode === "message" && (
             <>
               <View style={styles.saveRow}>
-                <TouchableOpacity
-                  style={[styles.saveBtn, { backgroundColor: theme.accent }, saving && styles.btnDisabled]}
-                  onPress={handleSaveToGallery}
-                  disabled={saving}
-                >
-                  <Text style={styles.saveBtnText}>📸 儲存到相簿</Text>
-                </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.shareBtn, { borderColor: theme.accent }, saving && styles.btnDisabled]}
                   onPress={handleShare}
@@ -1216,16 +1171,8 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   imageHint: { fontSize: 12, color: "#6b7280", marginBottom: 12 },
-  // Save / Share
-  saveRow: { flexDirection: "row", gap: 10, marginBottom: 8 },
-  saveBtn: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 15, textAlign: "center" },
+  // Share
+  saveRow: { flexDirection: "row", marginBottom: 8 },
   shareBtn: {
     flex: 1,
     paddingVertical: 13,
