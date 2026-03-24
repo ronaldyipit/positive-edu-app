@@ -6,8 +6,8 @@ module.exports = {
     name: "正發光",
     slug: "positive-edu-app",
     version: "1.0.0",
-    /** EAS Update：與已安裝二進位嘅 `expo.version`（App 版本）一致先會收到 OTA */
-    runtimeVersion: { policy: "appVersion" },
+    /** EAS Update（bare workflow）：需手動設定固定 runtimeVersion 字串 */
+    runtimeVersion: "1.0.0",
     updates: {
       url: "https://u.expo.dev/2d7873c8-7bb2-48dd-9c7a-6e75d55f2c98"
     },
