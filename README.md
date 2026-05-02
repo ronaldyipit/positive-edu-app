@@ -11,6 +11,25 @@
 
 Other screens include a **home** overview and **settings** (for example account and display options).
 
+## How to access the app
+
+Whether you need this section depends on who reads the README:
+
+- **General visitors (GitHub, portfolio):** Yes—say clearly if the app is **on the Play Store / App Store**, or share a **public install link** (e.g. internal testing, APK/IPA download, or TestFlight). If it is **not published**, say so in one sentence and how you can share a build on request (thesis marker, school, etc.).
+- **Only thesis markers / your school:** A short note is enough: where the install file lives (e.g. appendix, LMS, email) and whether a **test account** is required.
+
+This repo does **not** include full developer setup here; keep access instructions **short** and replace the placeholders below when you have real links.
+
+| Status | What to put here |
+|--------|-------------------|
+| Published | Store links + optional short “what you need” (e.g. internet for AI coach). |
+| Not published | “Not on public stores yet.” + how evaluators get the build + any test login. |
+
+**Placeholders (edit before sharing widely):**
+
+- **Install:** *[Add Google Play / App Store URL, or “available on request from the author.”]*  
+- **Requirements:** *[e.g. Android version; network for cloud features; optional note that some features need a configured backend.]*
+
 ## Important limitations
 
 - The app is **educational and preventive**. It is **not** an emergency or mental-health service.
