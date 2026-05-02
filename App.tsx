@@ -1,6 +1,10 @@
 import React from "react";
 import { View, Text, ActivityIndicator, StyleSheet, Image } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import {
+  NavigationContainer,
+  DefaultTheme as NavDefaultTheme,
+  DarkTheme as NavDarkTheme
+} from "@react-navigation/native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { AppBackground } from "./src/components/AppBackground";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -8,6 +12,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
+import { ThemeProvider, useTheme } from "./src/contexts/ThemeContext";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
@@ -33,10 +38,15 @@ function AuthNavigator() {
 }
 
 function MainTabs() {
+  const { colors, isDark } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarStyle: {
+          backgroundColor: colors.tabBarBg,
+          borderTopColor: colors.tabBarBorder
+        },
         tabBarIcon: ({ color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = "home-outline";
           if (route.name === "主頁") iconName = "home-outline";
@@ -47,8 +57,11 @@ function MainTabs() {
           else if (route.name === "設定") iconName = "settings-outline";
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: "#d56c2f",
-        tabBarInactiveTintColor: "#9ca3af"
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: isDark ? "#64748b" : "#9ca3af",
+        tabBarLabelStyle: {
+          fontSize: 11
+        }
       })}
     >
       <Tab.Screen name="主頁" component={HomeScreen} />
@@ -91,23 +104,48 @@ function RootNavigator() {
   return user && !pendingOtp ? <MainTabs /> : <AuthNavigator />;
 }
 
+function AppNavigation() {
+  const { isDark, colors } = useTheme();
+  const navTheme = React.useMemo(
+    () => ({
+      ...(isDark ? NavDarkTheme : NavDefaultTheme),
+      colors: {
+        ...(isDark ? NavDarkTheme : NavDefaultTheme).colors,
+        primary: colors.accent,
+        background: colors.safeAreaBg,
+        card: colors.tabBarBg,
+        text: colors.text,
+        border: colors.tabBarBorder,
+        notification: colors.accent
+      }
+    }),
+    [isDark, colors]
+  );
+
+  return (
+    <NavigationContainer theme={navTheme}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.safeAreaBg }]} edges={["top", "left", "right"]}>
+        <RootNavigator />
+      </SafeAreaView>
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <StatusBar style="dark" />
-          <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-            <RootNavigator />
-          </SafeAreaView>
-        </NavigationContainer>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppNavigation />
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#fefce8" },
+  safeArea: { flex: 1 },
   loading: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingLogo: { width: 80, height: 80, marginBottom: 16 },
   loadingText: { marginTop: 8, fontSize: 14, color: "#78716c" }

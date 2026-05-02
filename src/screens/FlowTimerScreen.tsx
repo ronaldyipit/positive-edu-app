@@ -7,17 +7,19 @@ import {
   Animated,
   ScrollView,
   TextInput,
+  KeyboardAvoidingView,
   Linking,
   StatusBar,
   Modal,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  Dimensions
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useNavigation } from "@react-navigation/native";
-import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { useBottomTabBarHeight, type BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import type { RootTabParamList } from "../navigation/types";
 import { AppBackground } from "../components/AppBackground";
 import { DefinitionInfoModal, definitionModalTextStyles } from "../components/DefinitionInfoModal";
@@ -59,6 +61,29 @@ const TIME_GUESS_OPTIONS = [5, 10, 15, 20, 25, 30, 40, 45, 60];
 const SAFETY_CONTACT_KEY = "@deep_dive_safety_contact";
 const LONG_PRESS_EXIT_SEC = 5;
 
+const FLOW_ONBOARDING_KEY = "@flow_onboarding_carousel_v1";
+const SCREEN_WIDTH = Dimensions.get("window").width;
+/** 與 ScrollView 可視寬度一致，pagingEnabled 才會對齊 */
+const ONBOARDING_VIEW_W = SCREEN_WIDTH - 88;
+
+const FLOW_ONBOARDING_SLIDES = [
+  {
+    title: "離線深潛係做乜？",
+    body:
+      "用計時幫你專注做一件事，暫時離開通知同分心，好似潛水咁專心做好眼前嘅任務——唔係叫你「再努力啲」，而係俾一段有邊界嘅時間你。"
+  },
+  {
+    title: "心流係乜？（生活化例子）",
+    body:
+      "打機打到唔覺時間、畫畫畫到唔捨得停——當挑戰同能力啱啱好，你就會好投入。溫書、做功課都可以透過「清楚目標 + 適中難度」去接近呢種感覺。"
+  },
+  {
+    title: "點開始？",
+    body:
+      "寫低任務名、揀時長；需要時先用 WhatsApp／SMS 同信任嘅人報平安。計時完會問你覺得過咗幾耐，等你感受專注同時間感嘅關係。"
+  }
+];
+
 /** 將電話轉成 WhatsApp 用的國際格式（僅數字，可選加 852） */
 function toWhatsAppPhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
@@ -71,6 +96,7 @@ function toWhatsAppPhone(raw: string): string | null {
 
 export default function FlowTimerScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
+  const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
   /** 底部略留空即可（Tab 內容區已在上方面板，毋須過大留白） */
   const scrollBottomPad = 12 + Math.min(insets.bottom, 20) + 20;
@@ -111,6 +137,19 @@ export default function FlowTimerScreen() {
   const [exitLongPressProgress, setExitLongPressProgress] = useState(0);
   const longPressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const longPressStartRef = useRef(0);
+  const [showFlowOnboarding, setShowFlowOnboarding] = useState(false);
+  const [onboardingPage, setOnboardingPage] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const v = await AsyncStorage.getItem(FLOW_ONBOARDING_KEY);
+        if (v !== "1") setShowFlowOnboarding(true);
+      } catch {
+        setShowFlowOnboarding(true);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -322,8 +361,55 @@ export default function FlowTimerScreen() {
     setRemaining(totalSeconds);
   }
 
+  const dismissOnboarding = async () => {
+    try {
+      await AsyncStorage.setItem(FLOW_ONBOARDING_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setShowFlowOnboarding(false);
+  };
+
   return (
     <AppBackground>
+      <Modal visible={showFlowOnboarding} transparent animationType="fade" onRequestClose={dismissOnboarding}>
+        <View style={styles.onboardingOverlay}>
+          <View style={styles.onboardingCard}>
+            <Text style={styles.onboardingHeading}>歡迎使用離線深潛</Text>
+            <Text style={styles.onboardingHint}>左右滑動睇三步簡介</Text>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={{ width: ONBOARDING_VIEW_W, alignSelf: "center" }}
+              onScroll={(e) => {
+                const x = e.nativeEvent.contentOffset.x;
+                setOnboardingPage(Math.round(x / ONBOARDING_VIEW_W));
+              }}
+              scrollEventThrottle={16}
+            >
+              {FLOW_ONBOARDING_SLIDES.map((s, idx) => (
+                <View key={idx} style={[styles.onboardingSlide, { width: ONBOARDING_VIEW_W }]}>
+                  <Text style={styles.onboardingTitle}>{s.title}</Text>
+                  <Text style={styles.onboardingBody}>{s.body}</Text>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={styles.onboardingDots}>
+              {FLOW_ONBOARDING_SLIDES.map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.onboardingDot, i === onboardingPage && styles.onboardingDotActive]}
+                />
+              ))}
+            </View>
+            <TouchableOpacity style={styles.onboardingBtn} onPress={dismissOnboarding} activeOpacity={0.85}>
+              <Text style={styles.onboardingBtnText}>開始使用</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <StatusBar hidden={running} />
       {running ? (
         <View style={styles.flowModeContainer}>
@@ -358,6 +444,11 @@ export default function FlowTimerScreen() {
       ) : (
       <View style={styles.outerWrap}>
       <View style={styles.whiteCard}>
+    <KeyboardAvoidingView
+      style={styles.scroll}
+      behavior="padding"
+      keyboardVerticalOffset={tabBarHeight + (Platform.OS === "android" ? 8 : 0)}
+    >
     <ScrollView
       style={styles.scroll}
       contentContainerStyle={[styles.container, { paddingBottom: scrollBottomPad }]}
@@ -544,6 +635,7 @@ export default function FlowTimerScreen() {
         </View>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
       </View>
     </View>
       )}
@@ -923,5 +1015,40 @@ const styles = StyleSheet.create({
   safetyModalBody: { fontSize: 14, color: "#374151", marginBottom: 8, lineHeight: 20 },
   safetyPreview: { fontSize: 12, color: "#6b7280", marginBottom: 12, fontStyle: "italic" },
   safetyContactInput: { borderWidth: 1, borderColor: "#d1d5db", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, marginBottom: 16, backgroundColor: "#fff" },
-  safetyButtonsRow: { flexDirection: "column", gap: 10 }
+  safetyButtonsRow: { flexDirection: "column", gap: 10 },
+  onboardingOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.72)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20
+  },
+  onboardingCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 20,
+    width: "100%",
+    maxWidth: 420
+  },
+  onboardingHeading: { fontSize: 20, fontWeight: "800", color: "#0f172a", textAlign: "center", marginBottom: 6 },
+  onboardingHint: { fontSize: 12, color: "#64748b", textAlign: "center", marginBottom: 12 },
+  onboardingSlide: {
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0"
+  },
+  onboardingTitle: { fontSize: 16, fontWeight: "800", color: "#1e293b", marginBottom: 8 },
+  onboardingBody: { fontSize: 14, color: "#475569", lineHeight: 22 },
+  onboardingDots: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 8, marginBottom: 14 },
+  onboardingDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#cbd5e1" },
+  onboardingDotActive: { backgroundColor: "#d56c2f", width: 18 },
+  onboardingBtn: {
+    backgroundColor: "#d56c2f",
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center"
+  },
+  onboardingBtnText: { color: "#fff", fontWeight: "800", fontSize: 16 }
 });

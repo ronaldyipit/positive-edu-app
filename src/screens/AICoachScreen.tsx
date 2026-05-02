@@ -14,12 +14,16 @@ import {
   Keyboard,
   Platform,
   Modal,
-  Linking
+  Linking,
+  Alert
 } from "react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import { AppBackground } from "../components/AppBackground";
 import { DefinitionInfoModal } from "../components/DefinitionInfoModal";
+import { detectCrisisInUserText, CRISIS_COACH_REPLY } from "../utils/crisisDetection";
+import { splitCoachBodyIntoChunks } from "../utils/coachBubbleSplit";
+import { useTheme } from "../contexts/ThemeContext";
 
 const STRENGTH_CITATION_URL =
   "https://global.oup.com/academic/product/character-strengths-and-virtues-9780195167016";
@@ -197,7 +201,13 @@ const MOOD_BUTTONS = [
   { emoji: "🌟", label: "想成長" }
 ];
 
-function TypingDots() {
+/** 引導正面情緒分享（置於情緒快捷列之上） */
+const POSITIVE_QUICK_BUTTONS = [
+  { emoji: "🎉", prefix: "我想分享開心事：" },
+  { emoji: "🏆", prefix: "我剛達成一個小目標：" }
+];
+
+function TypingDots({ dotColor = "#9ca3af" }: { dotColor?: string }) {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -220,7 +230,10 @@ function TypingDots() {
   return (
     <View style={typingStyles.row}>
       {[dot1, dot2, dot3].map((d, i) => (
-        <Animated.View key={i} style={[typingStyles.dot, { transform: [{ translateY: d }] }]} />
+        <Animated.View
+          key={i}
+          style={[typingStyles.dot, { backgroundColor: dotColor, transform: [{ translateY: d }] }]}
+        />
       ))}
     </View>
   );
@@ -228,10 +241,11 @@ function TypingDots() {
 
 const typingStyles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 6, paddingHorizontal: 4 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9ca3af" }
+  dot: { width: 8, height: 8, borderRadius: 4 }
 });
 
 export default function AICoachScreen() {
+  const { colors: themeColors, isDark } = useTheme();
   const route = useRoute<RouteProp<RootTabParamList, "正向教練">>();
   const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
   const tabBarHeight = useBottomTabBarHeight();
@@ -246,6 +260,8 @@ export default function AICoachScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showCrisisModal, setShowCrisisModal] = useState(false);
+  const [crisisMode, setCrisisMode] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   const handleStartChatRef = useRef<() => void>(() => {});
@@ -318,14 +334,58 @@ export default function AICoachScreen() {
     );
   };
 
+  const appendCoachReplyStaggered = async (fullReply: string) => {
+    const tokenLines = COACH_NAV_LINK_ORDER.filter((x) => fullReply.includes(x.token)).map((x) => x.token);
+    const suffix = tokenLines.length ? "\n\n" + tokenLines.join("\n") : "";
+    const { body } = stripCoachNavTokens(fullReply);
+    const trimmedBody = body.trim();
+    if (!trimmedBody && !suffix) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `${Date.now()}-empty`,
+          from: "coach",
+          text: "暫時未能取得回應，請稍後再試，或和身邊信任的大人談談。"
+        }
+      ]);
+      return;
+    }
+    const chunks = splitCoachBodyIntoChunks(trimmedBody || "（續）", 3).filter((c) => c.trim().length > 0);
+    const finalChunks = chunks.length ? chunks : [trimmedBody];
+    for (let i = 0; i < finalChunks.length; i++) {
+      if (i > 0) {
+        setLoading(true);
+        scrollToBottom();
+        await new Promise((r) => setTimeout(r, 680));
+        setLoading(false);
+      }
+      const text = i === finalChunks.length - 1 ? finalChunks[i] + suffix : finalChunks[i];
+      setMessages((prev) => [...prev, { id: `${Date.now()}-coach-${i}`, from: "coach", text }]);
+      scrollToBottom();
+    }
+  };
+
   const handleSend = async (overrideText?: string) => {
+    if (crisisMode) {
+      setShowCrisisModal(true);
+      return;
+    }
     const text = (overrideText ?? input).trim();
     if (!text || loading) return;
     const userMessage: Message = { id: Date.now().toString(), from: "user", text };
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
-    setLoading(true);
     scrollToBottom();
+
+    if (detectCrisisInUserText(text)) {
+      setCrisisMode(true);
+      setMessages((prev) => [...prev, { id: `${Date.now()}-crisis-local`, from: "coach", text: CRISIS_COACH_REPLY }]);
+      setShowCrisisModal(true);
+      scrollToBottom();
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const strengthLabels = selectedStrengths
@@ -343,14 +403,26 @@ export default function AICoachScreen() {
         body: JSON.stringify({ messages: history, strengths: strengthLabels })
       });
       const data = await response.json();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `${Date.now()}-coach`,
-          from: "coach",
-          text: data?.reply ?? "暫時未能取得回應，請稍後再試，或和身邊信任的大人談談。"
-        }
-      ]);
+
+      if (data?.crisis === true) {
+        setLoading(false);
+        setCrisisMode(true);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `${Date.now()}-crisis-api`,
+            from: "coach",
+            text: data?.reply ?? CRISIS_COACH_REPLY
+          }
+        ]);
+        setShowCrisisModal(true);
+        scrollToBottom();
+        return;
+      }
+
+      const reply = data?.reply ?? "暫時未能取得回應，請稍後再試，或和身邊信任的大人談談。";
+      setLoading(false);
+      await appendCoachReplyStaggered(reply);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -367,9 +439,18 @@ export default function AICoachScreen() {
     return (
       <AppBackground>
       <View style={styles.outerWrap}>
-        <View style={styles.whiteCard}>
+        <View
+          style={[
+            styles.whiteCard,
+            {
+              backgroundColor: themeColors.card,
+              borderWidth: isDark ? 1 : 0,
+              borderColor: themeColors.cardBorder
+            }
+          ]}
+        >
       <ScrollView style={styles.container} contentContainerStyle={styles.selectContainer}>
-        <Text style={styles.title} accessibilityRole="header">
+        <Text style={[styles.title, { color: themeColors.text }]} accessibilityRole="header">
           {COACH_MODULE_TITLE}
         </Text>
 
@@ -533,15 +614,32 @@ export default function AICoachScreen() {
   return (
     <AppBackground>
     <View style={styles.outerWrap}>
-      <View style={styles.whiteCard}>
+      <View
+        style={[
+          styles.whiteCard,
+          {
+            backgroundColor: themeColors.card,
+            borderWidth: isDark ? 1 : 0,
+            borderColor: themeColors.cardBorder
+          }
+        ]}
+      >
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={Platform.OS === "ios" ? tabBarHeight : 0}
+      behavior="padding"
+      keyboardVerticalOffset={tabBarHeight + (Platform.OS === "android" ? 8 : 0)}
     >
       {/* 頂部：已選優勢標籤 */}
       {selectedStrengths.length > 0 && (
-        <View style={styles.strengthsBar}>
+        <View
+          style={[
+            styles.strengthsBar,
+            {
+              backgroundColor: isDark ? "#1e293b" : "#fff7ed",
+              borderBottomColor: isDark ? "#334155" : "#fed7aa"
+            }
+          ]}
+        >
           {selectedStrengths.map((id) => {
             const s = getStrengthById(id);
             if (!s) return null;
@@ -556,6 +654,29 @@ export default function AICoachScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* 正面情緒快捷 */}
+      <View style={styles.positiveQuickRow}>
+        {POSITIVE_QUICK_BUTTONS.map((p) => (
+          <TouchableOpacity
+            key={p.prefix}
+            style={[
+              styles.positiveQuickBtn,
+              {
+                backgroundColor: isDark ? "#172554" : "#f0fdf4",
+                borderColor: isDark ? "#334155" : "#bbf7d0"
+              }
+            ]}
+            onPress={() => handleSend(`${p.emoji} ${p.prefix}`)}
+            disabled={loading}
+          >
+            <Text style={styles.positiveQuickEmoji}>{p.emoji}</Text>
+            <Text style={[styles.positiveQuickLabel, { color: themeColors.text }]}>
+              {p.prefix.replace("：", "")}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       {/* 情緒快選 */}
       <View style={styles.moodRow}>
@@ -589,16 +710,26 @@ export default function AICoachScreen() {
             {m.from === "coach" && (
               <View style={styles.avatar}><Text style={styles.avatarText}>🌱</Text></View>
             )}
-            <View style={[styles.bubble, m.from === "user" ? styles.userBubble : styles.coachBubble]}>
+            <View
+              style={[
+                styles.bubble,
+                m.from === "user" ? styles.userBubble : styles.coachBubble,
+                m.from === "coach" && {
+                  backgroundColor: themeColors.bubbleCoach,
+                  borderWidth: isDark ? 1 : 0,
+                  borderColor: themeColors.cardBorder
+                }
+              ]}
+            >
               {m.from === "coach" ? (
                 (() => {
                   const { body, links } = stripCoachNavTokens(m.text);
                   return (
                     <View>
-                      <Text style={styles.bubbleText}>
+                      <Text style={[styles.bubbleText, { color: themeColors.text }]}>
                         {parseBoldSegments(body).map((seg, i) =>
                           seg.bold ? (
-                            <Text key={i} style={[styles.bubbleText, styles.bubbleTextBold]}>
+                            <Text key={i} style={[styles.bubbleText, styles.bubbleTextBold, { color: themeColors.text }]}>
                               {seg.text}
                             </Text>
                           ) : (
@@ -613,7 +744,7 @@ export default function AICoachScreen() {
                           onPress={() => navigation.navigate(link.screen)}
                           activeOpacity={0.7}
                         >
-                          <Text style={styles.moduleNavLinkText}>{link.label}</Text>
+                          <Text style={[styles.moduleNavLinkText, { color: themeColors.accent }]}>{link.label}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
@@ -631,7 +762,19 @@ export default function AICoachScreen() {
         {loading && (
           <View style={[styles.messageRow, styles.messageRowCoach]}>
             <View style={styles.avatar}><Text style={styles.avatarText}>🌱</Text></View>
-            <View style={[styles.bubble, styles.coachBubble]}><TypingDots /></View>
+            <View
+              style={[
+                styles.bubble,
+                styles.coachBubble,
+                {
+                  backgroundColor: themeColors.bubbleCoach,
+                  borderWidth: isDark ? 1 : 0,
+                  borderColor: themeColors.cardBorder
+                }
+              ]}
+            >
+              <TypingDots dotColor={isDark ? "#94a3b8" : "#9ca3af"} />
+            </View>
           </View>
         )}
 
@@ -653,11 +796,23 @@ export default function AICoachScreen() {
       </ScrollView>
 
       {/* 輸入框（緊貼鍵盤上方；聲明與書目已置於上方對話捲動區底部） */}
-      <View style={styles.inputRow}>
+      <View
+        style={[
+          styles.inputRow,
+          { backgroundColor: themeColors.card, borderTopColor: themeColors.cardBorder }
+        ]}
+      >
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: themeColors.inputBg,
+              borderColor: themeColors.inputBorder,
+              color: themeColors.text
+            }
+          ]}
           placeholder="輸入你想說的話..."
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={themeColors.textSubtle}
           value={input}
           onChangeText={setInput}
           multiline
@@ -666,17 +821,61 @@ export default function AICoachScreen() {
           returnKeyType="default"
           blurOnSubmit={false}
           onFocus={() => scrollToBottom()}
-          editable={!loading}
+          editable={!loading && !crisisMode}
         />
         <TouchableOpacity
-          style={[styles.sendButton, (!input.trim() || loading) && styles.sendButtonDisabled]}
+          style={[styles.sendButton, (!input.trim() || loading || crisisMode) && styles.sendButtonDisabled]}
           onPress={() => handleSend()}
-          disabled={!input.trim() || loading}
+          disabled={!input.trim() || loading || crisisMode}
         >
           <Text style={styles.sendText}>送出</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
+
+      <Modal
+        visible={showCrisisModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.crisisOverlay}>
+          <View style={[styles.crisisCard, { backgroundColor: themeColors.card, borderColor: themeColors.cardBorder }]}>
+            <Text style={[styles.crisisTitle, { color: themeColors.text }]}>我哋好關心你</Text>
+            <Text style={[styles.crisisBody, { color: themeColors.textMuted }]}>
+              系統偵測到你可能正處於極度困擾。一般 AI 回覆已暫停，請立即聯絡真人支援。呢個 App 唔能夠提供即時危機服務。
+            </Text>
+            <TouchableOpacity
+              style={styles.crisisHotlineBtn}
+              onPress={() => Linking.openURL("tel:23892222")}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.crisisHotlineBtnText}>📞 一鍵致電撒瑪利亞會 2389 2222</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.crisisHotlineBtn}
+              onPress={() => Linking.openURL("tel:28960000")}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.crisisHotlineBtnText}>📞 一鍵致電生命熱線 2896 0000</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.crisisSecondaryBtn, { borderColor: themeColors.cardBorder }]}
+              onPress={() =>
+                Alert.alert(
+                  "聯絡信任嘅大人",
+                  "請盡快搵一位你信任嘅大人（例如家人或老師）當面傾下，清楚講出你需要即時支援。你亦可請家人陪同你即時求助。"
+                )
+              }
+            >
+              <Text style={[styles.crisisSecondaryBtnText, { color: themeColors.accent }]}>聯絡信任嘅大人</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.crisisDismissBtn} onPress={() => { setShowCrisisModal(false); setCrisisMode(false); }}>
+              <Text style={[styles.crisisDismissText, { color: themeColors.textSubtle }]}>我已聯絡支援，返回對話</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       </View>
     </View>
     </AppBackground>
@@ -862,6 +1061,28 @@ const styles = StyleSheet.create({
   },
   moodEmoji: { fontSize: 16 },
   moodLabel: { fontSize: 12, color: "#374151", fontWeight: "500", textAlign: "center" },
+  positiveQuickRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4
+  },
+  positiveQuickBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    minWidth: "42%",
+    justifyContent: "center"
+  },
+  positiveQuickEmoji: { fontSize: 16 },
+  positiveQuickLabel: { fontSize: 12, fontWeight: "700", flexShrink: 1 },
   // Chat
   chat: { flex: 1 },
   chatContent: { padding: 12, gap: 4, paddingBottom: 20 },
@@ -937,5 +1158,39 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: { opacity: 0.4 },
   sendText: { color: "#fff", fontWeight: "700", textAlign: "center" },
-  disclaimer: { fontSize: 11, color: "#9ca3af", textAlign: "center", paddingBottom: 4 }
+  disclaimer: { fontSize: 11, color: "#9ca3af", textAlign: "center", paddingBottom: 4 },
+  crisisOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.78)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24
+  },
+  crisisCard: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 22,
+    borderWidth: 1
+  },
+  crisisTitle: { fontSize: 20, fontWeight: "800", textAlign: "center", marginBottom: 10 },
+  crisisBody: { fontSize: 14, lineHeight: 22, marginBottom: 16, textAlign: "center" },
+  crisisHotlineBtn: {
+    backgroundColor: "#d56c2f",
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    marginBottom: 10
+  },
+  crisisHotlineBtnText: { color: "#fff", fontWeight: "800", fontSize: 15, textAlign: "center" },
+  crisisSecondaryBtn: {
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    marginBottom: 8
+  },
+  crisisSecondaryBtnText: { fontWeight: "700", fontSize: 14 },
+  crisisDismissBtn: { paddingVertical: 10, alignItems: "center" },
+  crisisDismissText: { fontSize: 13 }
 });

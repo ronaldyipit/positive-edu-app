@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Image, ScrollView, Switch } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../contexts/AuthContext";
 import { AppBackground } from "../components/AppBackground";
+import { useTheme } from "../contexts/ThemeContext";
 import { getGamificationState, getLevelName, LEVEL_NAMES, LEVEL_XP } from "../utils/gamification";
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
+  const { isDark, colors, setDarkMode } = useTheme();
   const [level, setLevel] = useState(1);
   const [xp, setXp] = useState(0);
 
@@ -24,17 +26,42 @@ export default function SettingsScreen() {
   return (
     <AppBackground>
     <View style={styles.outerWrap}>
-      <View style={styles.whiteCard}>
+      <View
+        style={[
+          styles.whiteCard,
+          {
+            backgroundColor: colors.card,
+            borderWidth: isDark ? 1 : 0,
+            borderColor: colors.cardBorder
+          }
+        ]}
+      >
       <ScrollView showsVerticalScrollIndicator={false}>
       <Image
         source={require("../../assets/img/AppLogo.png")}
         style={styles.appLogo}
         resizeMode="contain"
       />
-      <Text style={styles.title}>設定</Text>
+      <Text style={[styles.title, { color: colors.text }]}>設定</Text>
       {user?.email ? (
-        <Text style={styles.email}>目前帳號：{user.email}</Text>
+        <Text style={[styles.email, { color: colors.textMuted }]}>目前帳號：{user.email}</Text>
       ) : null}
+
+      <View style={[styles.darkModeRow, { borderColor: colors.cardBorder, backgroundColor: isDark ? "#0f172a" : "#f8fafc" }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.darkModeTitle, { color: colors.text }]}>深色模式</Text>
+          <Text style={[styles.darkModeSub, { color: colors.textSubtle }]}>
+            柔和深灰／深藍背景，睡前使用較不刺眼
+          </Text>
+        </View>
+        <Switch
+          value={isDark}
+          onValueChange={(v) => setDarkMode(v)}
+          trackColor={{ false: "#cbd5e1", true: "#475569" }}
+          thumbColor={isDark ? "#fb923c" : "#f4f4f5"}
+        />
+      </View>
+
       <View style={styles.levelSummary}>
         <Text style={styles.levelSummaryTitle}>目前等級</Text>
         <Text style={styles.levelSummaryValue}>Lv.{level}・{getLevelName(level)}</Text>
@@ -77,9 +104,19 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 3
   },
+  darkModeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 18
+  },
+  darkModeTitle: { fontSize: 16, fontWeight: "700" },
+  darkModeSub: { fontSize: 12, marginTop: 4, lineHeight: 18 },
   appLogo: { width: 120, height: 120, alignSelf: "center", marginBottom: 16 },
   title: { fontSize: 22, fontWeight: "700", color: "#111827", marginBottom: 8 },
-  email: { fontSize: 14, color: "#6b7280", marginBottom: 24 },
+  email: { fontSize: 14, color: "#6b7280", marginBottom: 16 },
   levelSummary: {
     backgroundColor: "#eff6ff",
     borderWidth: 1,

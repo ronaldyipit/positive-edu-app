@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  KeyboardAvoidingView,
   Alert,
   Platform,
   Image,
@@ -19,6 +20,7 @@ import ViewShot from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import * as IntentLauncher from "expo-intent-launcher";
 import { Audio } from "expo-av";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { AppBackground } from "../components/AppBackground";
 import { DefinitionInfoModal } from "../components/DefinitionInfoModal";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -34,9 +36,9 @@ const GRATITUDE_CITATION =
   "Emmons, R. A. (2007). Thanks!: How the new science of gratitude can make you happier. Houghton Mifflin.";
 
 const MODES = [
-  { id: "message", label: "1) 寫感謝訊息" },
+  { id: "message", label: "1) 寫感謝訊息（真心，唔係交換）" },
   { id: "repay", label: "2) 默默報答同一個人" },
-  { id: "forward", label: "3) 把善意傳揚開去" }
+  { id: "forward", label: "3) 讓愛傳出去（Pay it forward）" }
 ] as const;
 type TorchMode = (typeof MODES)[number]["id"];
 type TorchTask = {
@@ -67,11 +69,11 @@ const THEMES = [
 ];
 
 const RANDOM_PROMPTS = [
-  "今天邊個幫你慳咗 10 分鐘？",
-  "最近邊個喺你低潮時撐咗你一下？",
-  "有冇一件小事令你覺得世界其實幾暖？",
-  "如果要回應一次善意，你會做乜？",
-  "若果係陌生人幫咗你，你會點傳落去？"
+  "今日有冇人對你微笑、讓路，或講咗句鼓勵說話？（唔使花錢嘅善意）",
+  "邊個喺你低潮時撐咗你一下？你想點樣令呢份支持延續落去？",
+  "有冇一件小事令你覺得心入面暖咗？感恩係內在狀態，唔係「要還人情」。",
+  "你可以點樣把善意傳出去？例如：對下一個人微笑、幫後面嘅人按住門。",
+  "若果陌生人幫咗你，你想點樣用非物質嘅方式傳落去？"
 ];
 
 const CARD_TEMPLATES = [
@@ -84,6 +86,7 @@ const CARD_TEMPLATES = [
 ];
 
 export default function GratitudeCardScreen() {
+  const tabBarHeight = useBottomTabBarHeight();
   const [mode, setMode] = useState<TorchMode>("message");
   const [recipient, setRecipient] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -580,6 +583,11 @@ export default function GratitudeCardScreen() {
     <AppBackground>
     <View style={styles.outerWrap}>
       <View style={styles.whiteCard}>
+    <KeyboardAvoidingView
+      style={styles.scroll}
+      behavior="padding"
+      keyboardVerticalOffset={tabBarHeight + (Platform.OS === "android" ? 8 : 0)}
+    >
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <Text style={styles.title}>火炬傳暖</Text>
       <View style={styles.expHintBox}>
@@ -590,8 +598,8 @@ export default function GratitudeCardScreen() {
       </View>
       <View style={styles.resonanceBlock}>
         <Text style={styles.resonanceText}>
-          有時唔係冇人幫你，只係忙到連一句多謝都未講出口。{"\n"}
-          感恩唔係要你煽情，而係幫你記得：你唔係一個人，身邊一直有人同善意撐住你。
+          重點係「讓愛傳出去」（Pay it forward）：感恩係內在嘅溫暖同關係，唔係計分、唔係交換禮物。{"\n"}
+          一個微笑、一句多謝、幫後面嘅人按住門——非物質嘅小行動，都可以延續善意。
         </Text>
       </View>
       <TouchableOpacity style={styles.infoTriggerBtn} onPress={() => setShowGratitudeIntroModal(true)}>
@@ -600,10 +608,10 @@ export default function GratitudeCardScreen() {
       <View style={styles.moduleTaskBlock}>
         <Text style={styles.moduleTaskTitle}>接住善意：多謝、報答或傳開去</Text>
         <Text style={styles.moduleTaskText}>
-          以下有三種回應善意嘅方向，唔使次次做齊，揀你想做、做得嘅一種（或幾種）就得：{"\n"}
-          1) 寫感謝訊息，直接向對方表達謝意{"\n"}
-          2) 默默報答同一個人，用行動回應佢對你嘅好{"\n"}
-          3) 把善意傳揚開去，將呢份好意傳去下一個人{"\n\n"}
+          以下有三種方向，唔使次次做齊，揀你想做、做得嘅一種（或幾種）就得：{"\n"}
+          1) 寫感謝訊息——真心表達，唔係為咗「還人情」{"\n"}
+          2) 默默報答同一個人，用非物質或貼地嘅行動回應佢對你嘅好{"\n"}
+          3) 讓愛傳出去：將善意傳去下一個人（例如對陌生人微笑、傳一句鼓勵）{"\n\n"}
           完成後會記錄喺「火炬行動簿」，方便你慢慢實踐。
         </Text>
       </View>
@@ -923,6 +931,7 @@ export default function GratitudeCardScreen() {
         ) : null}
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
       </View>
     </View>
     <DefinitionInfoModal

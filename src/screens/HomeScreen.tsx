@@ -14,7 +14,15 @@ import { useFocusEffect } from "@react-navigation/native";
 import { AppBackground } from "../components/AppBackground";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../config/firebase";
-import { getGamificationState, getLevelName, LEVEL_XP } from "../utils/gamification";
+import {
+  getGamificationState,
+  getLevelName,
+  LEVEL_XP,
+  BADGE_DEFINITIONS,
+  getUnlockedBadges,
+  getAvatarPresentation
+} from "../utils/gamification";
+import { useTheme } from "../contexts/ThemeContext";
 
 const MODULES = [
   {
@@ -47,7 +55,7 @@ const MODULES = [
   {
     id: "感恩",
     title: "火炬傳暖",
-    desc: "用三種方式回應善意：答謝、默默報答、傳揚開去",
+    desc: "讓愛傳出去（Pay it forward）：答謝、默默報答、以非物質小行動延續善意",
     emoji: "🔥",
     accent: "#c026d3",
     bg: "#fdf4ff",
@@ -74,6 +82,7 @@ export default function HomeScreen({
   navigation: { navigate: (name: string) => void };
 }) {
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
   const [displayNameFromFirestore, setDisplayNameFromFirestore] = useState<string | null>(null);
   const displayName =
     user?.displayName?.trim() ||
@@ -83,6 +92,7 @@ export default function HomeScreen({
   const animValues = useRef(MODULES.map(() => new Animated.Value(0))).current;
   const [level, setLevel] = useState(1);
   const [xp, setXp] = useState(0);
+  const [totalXp, setTotalXp] = useState(0);
 
   useEffect(() => {
     if (!user?.uid || !db) return;
@@ -100,6 +110,7 @@ export default function HomeScreen({
         .then((g) => {
           setLevel(g.level);
           setXp(g.xp);
+          setTotalXp(g.totalXp);
         })
         .catch(() => {});
     }, [])
@@ -118,10 +129,22 @@ export default function HomeScreen({
     ).start();
   }, []);
 
+  const unlockedBadges = getUnlockedBadges(totalXp);
+  const avatar = getAvatarPresentation(level);
+
   return (
     <AppBackground>
       <View style={styles.outerWrap}>
-        <View style={styles.whiteCard}>
+        <View
+          style={[
+            styles.whiteCard,
+            {
+              backgroundColor: colors.card,
+              borderWidth: isDark ? 1 : 0,
+              borderColor: colors.cardBorder
+            }
+          ]}
+        >
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
@@ -132,21 +155,63 @@ export default function HomeScreen({
               style={styles.appLogo}
               resizeMode="contain"
             />
-            <Text style={styles.title}>正發光</Text>
-            <Text style={styles.welcome}>
+            <Text style={[styles.title, { color: colors.text }]}>正發光</Text>
+            <Text style={[styles.welcome, { color: colors.textMuted }]}>
               {displayName ? `你好，${displayName}！` : "你好！"}
             </Text>
-            <View style={styles.quoteWrap}>
-              <Text style={styles.quote}>{quote}</Text>
+            <View style={[styles.quoteWrap, { backgroundColor: isDark ? "#1e293b" : "#fffbeb", borderColor: isDark ? "#334155" : "#fde68a" }]}>
+              <Text style={[styles.quote, { color: isDark ? "#fde68a" : "#92400e" }]}>{quote}</Text>
             </View>
-            <View style={styles.levelWrap}>
-              <Text style={styles.levelTitle}>目前等級：Lv.{level}・{getLevelName(level)}</Text>
-              <View style={styles.levelBar}>
+
+            <View style={[styles.avatarRow, { backgroundColor: isDark ? "#0f172a" : "#f0fdf4", borderColor: isDark ? "#334155" : "#bbf7d0" }]}>
+              <View style={styles.avatarFaceWrap}>
+                <Text style={styles.avatarFaceEmoji}>{avatar.face}</Text>
+                {avatar.accessory ? (
+                  <Text style={styles.avatarAccessoryEmoji}>{avatar.accessory}</Text>
+                ) : null}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.avatarTitle, { color: colors.text }]}>發光小夥伴</Text>
+                <Text style={[styles.avatarSub, { color: colors.textSubtle }]}>
+                  隨等級提升會解鎖小配件——繼續累積 EXP 睇下有咩新驚喜！
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.badgeSection}>
+              <Text style={[styles.badgeSectionTitle, { color: colors.text }]}>成就徽章</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.badgeScroll}>
+                {BADGE_DEFINITIONS.map((b) => {
+                  const ok = unlockedBadges.some((u) => u.id === b.id);
+                  return (
+                    <View
+                      key={b.id}
+                      style={[
+                        styles.badgeChip,
+                        {
+                          opacity: ok ? 1 : 0.4,
+                          borderColor: ok ? colors.accent : colors.cardBorder,
+                          backgroundColor: isDark ? "#0f172a" : "#fff"
+                        }
+                      ]}
+                    >
+                      <Text style={styles.badgeEmoji}>{b.emoji}</Text>
+                      <Text style={[styles.badgeTitle, { color: colors.text }]}>{b.title}</Text>
+                      <Text style={[styles.badgeDesc, { color: colors.textSubtle }]}>{b.desc}</Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <View style={[styles.levelWrap, { backgroundColor: isDark ? "#172554" : "#eff6ff", borderColor: isDark ? "#334155" : "#bfdbfe" }]}>
+              <Text style={[styles.levelTitle, { color: isDark ? "#93c5fd" : "#1e40af" }]}>目前等級：Lv.{level}・{getLevelName(level)}</Text>
+              <View style={[styles.levelBar, { backgroundColor: isDark ? "#1e3a8a" : "#dbeafe" }]}>
                 <View style={[styles.levelFill, { width: `${Math.max(0, Math.min(100, (xp / LEVEL_XP) * 100))}%` }]} />
               </View>
-              <Text style={styles.levelSub}>距離下一級尚餘 {LEVEL_XP - xp} XP</Text>
+              <Text style={[styles.levelSub, { color: isDark ? "#93c5fd" : "#1d4ed8" }]}>距離下一級尚餘 {LEVEL_XP - xp} XP</Text>
             </View>
-            <Text style={styles.subtitle}>選擇一個功能開始吧</Text>
+            <Text style={[styles.subtitle, { color: colors.textSubtle }]}>選擇一個功能開始吧</Text>
 
             <View style={styles.grid}>
               {MODULES.map((m, i) => (
@@ -262,10 +327,37 @@ const styles = StyleSheet.create({
   levelSub: { fontSize: 11, color: "#1d4ed8", textAlign: "center" },
   subtitle: {
     fontSize: 13,
-    color: "#78716c",
     textAlign: "center",
     marginBottom: 20
   },
+  avatarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 14,
+    gap: 12
+  },
+  avatarFaceWrap: { position: "relative", width: 56, height: 56, justifyContent: "center", alignItems: "center" },
+  avatarFaceEmoji: { fontSize: 40 },
+  avatarAccessoryEmoji: { position: "absolute", top: -4, right: -4, fontSize: 20 },
+  avatarTitle: { fontSize: 15, fontWeight: "800" },
+  avatarSub: { fontSize: 11, marginTop: 4, lineHeight: 16 },
+  badgeSection: { marginBottom: 14 },
+  badgeSectionTitle: { fontSize: 13, fontWeight: "700", marginBottom: 8 },
+  badgeScroll: { gap: 10, paddingVertical: 4 },
+  badgeChip: {
+    width: 112,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    alignItems: "center"
+  },
+  badgeEmoji: { fontSize: 22, marginBottom: 4 },
+  badgeTitle: { fontSize: 12, fontWeight: "700", textAlign: "center" },
+  badgeDesc: { fontSize: 9, textAlign: "center", marginTop: 2 },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",

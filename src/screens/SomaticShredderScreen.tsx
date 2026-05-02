@@ -8,11 +8,13 @@ import {
   Animated,
   Easing,
   ScrollView,
+  KeyboardAvoidingView,
   Platform,
   Vibration
 } from "react-native";
 import { Accelerometer } from "expo-sensors";
 import { Audio } from "expo-av";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { AppBackground } from "../components/AppBackground";
 import { DefinitionInfoModal } from "../components/DefinitionInfoModal";
 
@@ -38,6 +40,7 @@ const BREATH_PHASES = [
 const SHAKE_THRESHOLD = 1.8; // 搖動強度門檻
 
 export default function SomaticShredderScreen() {
+  const tabBarHeight = useBottomTabBarHeight();
   const [showMindfulnessModal, setShowMindfulnessModal] = useState(false);
   const [ventText, setVentText] = useState("");
   const [step, setStep] = useState<"write" | "shake" | "shredded" | "breathe" | "done">("write");
@@ -255,6 +258,11 @@ export default function SomaticShredderScreen() {
     <AppBackground>
     <View style={styles.outerWrap}>
       <View style={styles.whiteCard}>
+    <KeyboardAvoidingView
+      style={styles.scroll}
+      behavior="padding"
+      keyboardVerticalOffset={tabBarHeight + (Platform.OS === "android" ? 8 : 0)}
+    >
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <Text style={styles.title}>紓壓碎紙</Text>
 
@@ -440,6 +448,7 @@ export default function SomaticShredderScreen() {
         </TouchableOpacity>
       )}
     </ScrollView>
+    </KeyboardAvoidingView>
       </View>
     </View>
 

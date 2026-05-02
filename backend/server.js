@@ -247,9 +247,45 @@ const ZHENG_FA_GUANG_APP_GUIDE = `
 3) 離線深潛：專注計時、可選時長；開始前可發「報平安」WhatsApp／SMS；有「什麼是心流」說明；計時中可長按約 5 秒提早結束。完整跑完一次（無提早結束）可獲 +20 EXP；結束後有時間感回顧，亦可一鍵帶內容返嚟正向教練傾。
 4) 紓壓（分頁路由名「紓壓」；底部 Tab 標籤顯示「紓壓碎紙」；畫面標題同「紓壓碎紙」）：寫低煩惱／壓力 → 搖機碎紙動畫 → 跟住做呼吸練習，幫身體同心情暫時鬆一鬆。
 5) 感恩（分頁標籤顯示：火炬傳暖）：三種方式—寫感謝訊息（成功傳送 +20 EXP）、默默報答同一個人（標記完成 +15）、把善意傳揚開去（標記完成 +30）；有「火炬行動簿」記錄任務，未完成可編輯／分頁瀏覽。
-6) 設定：帳戶與等級詳情、登出等。
+6) 設定：帳戶與等級詳情、深色模式開關、登出等。主頁可見 EXP、等級名與成就徽章。
 說明：EXP 獎勵以裝置內記錄為準；唔好承諾 App 冇寫明嘅功能。若使用者問到指南冇寫嘅細節，請話「我唔肯定呢項設定」並建議佢喺相關分頁試下或睇畫面說明。
 `.trim();
+
+/** 危機偵測：與前端 src/utils/crisisDetection.ts 保持大致一致 */
+const CRISIS_USER_REGEXES = [
+  /自殺/,
+  /自殘/,
+  /想死/,
+  /唔想活/,
+  /不想活/,
+  /尋死/,
+  /輕生/,
+  /了結(自己|生命)?/,
+  /結束生命/,
+  /割腕/,
+  /跳樓/,
+  /燒炭/,
+  /吃藥死/,
+  /一死了之/,
+  /suicide/i,
+  /self[-\s]?harm/i,
+  /kill\s+myself/i,
+  /end\s+my\s+life/i,
+  /want\s+to\s+die/i
+];
+
+function detectCrisisUserText(text) {
+  const s = String(text || "").trim();
+  if (s.length < 2) return false;
+  return CRISIS_USER_REGEXES.some((re) => re.test(s));
+}
+
+const CRISIS_COACH_REPLY =
+  "我哋好關心你嘅安全。呢個 App 唔能夠代替即時危機支援。\n\n" +
+  "請你而家：\n" +
+  "• 搵一位你信任嘅大人（例如家人或老師）當面傾下\n" +
+  "• 或致電撒瑪利亞會 24 小時熱線：2389 2222\n\n" +
+  "你唔係一個人，有人願意聽你講。";
 
 app.post("/api/coach", async (req, res) => {
   try {
@@ -268,6 +304,11 @@ app.post("/api/coach", async (req, res) => {
 
     const latestUserMsg =
       [...messages].reverse().find((m) => m?.role === "user" && typeof m?.content === "string")?.content || "";
+
+    if (detectCrisisUserText(latestUserMsg)) {
+      return res.json({ crisis: true, reply: CRISIS_COACH_REPLY });
+    }
+
     const ragContext = RAG_ENABLED ? buildRagContext(latestUserMsg, RAG_MAX_CHUNKS) : "";
 
     const priorCoachReplies = messages.filter((m) => m?.role === "assistant").length;
@@ -286,7 +327,7 @@ app.post("/api/coach", async (req, res) => {
       ? "ISSUE TURN LIMIT (same conversation thread): There have already been five coach replies before this one on this topic. " +
         "Do NOT ask any new reflective, Socratic, or coaching question; do not end with a question (except mandatory crisis hotline wording if needed). " +
         "If the user's latest message is clearly an App usage question, follow APP HELP EXCEPTION only—short factual answer, no coaching wrap-up. " +
-        "Otherwise reply in 2–4 short Traditional Chinese sentences: affirm their effort, optionally one takeaway grounded in Geelong snippets if present and relevant, otherwise PERMA-aligned encouragement, and one concrete small next step or suggesting a trusted adult if appropriate. " +
+        "Otherwise reply in very short Traditional Chinese chunks: affirm effort, optional one takeaway, one small next step—keep the **main text within ~50–80 Chinese characters** before tokens unless APP HELP needs more. " +
         "If MODULE NAV TOKENS apply below (e.g. [[FLOW]], [[TORCH]], or worry-pattern [[SHREDDER]]), you may end with those token lines—but without adding a coaching question. "
       : "QUESTION RULE: In each coaching reply you must ask exactly ONE short reflective question (not two), placed as the last sentence before any optional MODULE NAV TOKEN lines ([[SHREDDER]], [[FLOW]], [[TORCH]]). " +
         "Exception: if the APP HELP EXCEPTION applies below, ask zero coaching questions—fact-only answer. " +
@@ -303,7 +344,11 @@ app.post("/api/coach", async (req, res) => {
       strengthsClause +
       "You do NOT diagnose, label, or give clinical or crisis advice. " +
       "You focus on PERMA Meaning: helping students find meaning, notice character strengths, and build resilience. " +
-      "Keep a warm, hopeful, and non-judgmental tone. Aim for about 3–5 short sentences per reply when asking your one question (advice then question), unless a special rule below allows more. " +
+      "Keep a warm, hopeful, and non-judgmental tone. " +
+      "LENGTH & STYLE: The main reply (all text **before** optional MODULE NAV TOKEN lines) should usually stay within **50–80 Traditional Chinese characters** to avoid information overload. " +
+      "Use **colloquial, spoken** Traditional Chinese (口語化). If listing ideas, use short bullet lines starting with 「• 」. " +
+      "Exceptions: (1) APP HELP EXCEPTION may use up to ~120 characters when listing concrete app steps; (2) the full worry + [[SHREDDER]] pattern may use up to ~140 characters when strictly necessary; (3) mandatory crisis hotline wording overrides length. " +
+      "When asking your one reflective question, still stay within the length band by keeping setup sentences short. " +
       "STRICT MODULE NAME: The shredder feature is **only** 「紓壓碎紙」（四字，**不要**加「機」）. Never write 「紓壓碎紙機」「抒壓碎紙機」as the feature or tab name; you may still describe actions (寫低、搖動、碎紙、呼吸) in plain words. " +
       "APP HELP EXCEPTION: If the user is clearly asking how the app works, where to find a feature, what a tab does, or how to get EXP, " +
       "answer factually using ONLY the guide below (do not invent features). Use up to 5 short sentences and no reflective coaching question. " +
@@ -317,8 +362,8 @@ app.post("/api/coach", async (req, res) => {
           "\n\n" +
           "These snippets are the authoritative source for any Geelong Grammar School–specific advice; paraphrase briefly in Traditional Chinese and make it practical for the student.\n\n"
         : "") +
-      "If the user hints at self-harm or severe distress, encourage them to seek immediate help from a trusted adult, " +
-      "school social worker, or call the Samaritan Befrienders Hong Kong hotline 2389-2222. " +
+      "If the user hints at self-harm or severe distress, encourage them to seek immediate help from a trusted adult " +
+      "(e.g. family or a teacher) or call the Samaritan Befrienders Hong Kong hotline 2389-2222. " +
       "MODULE NAV TOKENS (the app turns these into tappable links; Traditional Chinese): Only these exact tokens exist—never invent others. " +
       "Each token must appear **alone on its own line** at the **very end** of your reply (after the reflective question when required). No punctuation on token lines. " +
       "Prefer **at most two** tokens per reply unless three clearly apply (rare). " +

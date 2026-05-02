@@ -34,6 +34,27 @@ export function getLevelName(level: number): string {
   return `發光大師`;
 }
 
+/** 成就徽章：依累積 EXP（totalXp）解鎖，於主頁展示 */
+export const BADGE_DEFINITIONS = [
+  { id: "spark", title: "初燃微光", emoji: "✨", minTotalXp: 50, desc: "累積 50 EXP" },
+  { id: "steady", title: "步履不停", emoji: "🌿", minTotalXp: 200, desc: "累積 200 EXP" },
+  { id: "torch", title: "暖意成炬", emoji: "🔥", minTotalXp: 500, desc: "累積 500 EXP" },
+  { id: "beacon", title: "正向燈塔", emoji: "🏮", minTotalXp: 900, desc: "累積 900 EXP" }
+] as const;
+
+export function getUnlockedBadges(totalXp: number) {
+  return BADGE_DEFINITIONS.filter((b) => totalXp >= b.minTotalXp);
+}
+
+/** 等級對應虛擬角色主造型（非精準科學，僅增趣味） */
+export function getAvatarPresentation(level: number): { face: string; accessory: string | null } {
+  if (level <= 2) return { face: "🌱", accessory: null };
+  if (level <= 4) return { face: "🌿", accessory: "🎀" };
+  if (level <= 6) return { face: "🌳", accessory: "⭐" };
+  if (level <= 8) return { face: "✨", accessory: "👑" };
+  return { face: "🏮", accessory: "🌟" };
+}
+
 export async function getGamificationState(): Promise<GamificationState> {
   try {
     const raw = await AsyncStorage.getItem(GAMIFICATION_KEY);
