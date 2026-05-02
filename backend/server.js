@@ -239,7 +239,7 @@ app.post("/api/reset-password", async (req, res) => {
 });
 
 /** 供 AI 教練回答「App 點用」—須與實際 Tab／功能一致 */
-const ZHENG_FA_GUANG_APP_GUIDE = `
+const POSIGLOW_APP_GUIDE = `
 【正發光 App 功能速覽 — 只作事實說明用】
 底部有六個分頁（名稱以畫面為準）：
 1) 主頁：進入各模組的入口、簡短介紹；可看到等級與 EXP 總覽（每 100 EXP 升一級，共 10 個級名）。
@@ -354,7 +354,7 @@ app.post("/api/coach", async (req, res) => {
       "answer factually using ONLY the guide below (do not invent features). Use up to 5 short sentences and no reflective coaching question. " +
       "If the guide does not cover their question, say honestly that you are unsure and suggest they open that tab or check on-screen hints. " +
       "\n\n" +
-      ZHENG_FA_GUANG_APP_GUIDE +
+      POSIGLOW_APP_GUIDE +
       "\n\n" +
       (ragContext
         ? "GEELONG BOOK CONTEXT (retrieved snippets from Positive Education: The Geelong Grammar School Journey):\n" +
