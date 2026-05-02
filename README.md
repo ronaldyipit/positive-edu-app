@@ -1,6 +1,6 @@
 # 正發光 (PosiGlow)
 
-**正發光** is a mobile well-being companion for **Hong Kong secondary school students**. It is built around ideas from **positive education** and the **PERMA+H** framework (positive emotions, engagement, relationships, meaning, accomplishment, and health). The app is meant to support everyday reflection, focus, and emotional regulation—not to replace counselling or clinical care.
+**正發光** is a mobile well-being companion for **Hong Kong secondary school students**. It is built around ideas from **positive education** and the **PERMA+H** framework (positive emotions, engagement, relationships, meaning, accomplishment, and health). The app supports everyday reflection, focus, and emotional regulation. It is **not** a substitute for counselling or clinical care.
 
 ## What you can do in the app
 
@@ -9,40 +9,21 @@
 - **紓壓碎紙** — Write down a worry, use a light “shred” ritual, then follow a short breathing animation to help the body settle.
 - **感恩 · 火炬傳暖** — Practise gratitude: thank someone in words, plan a kind action, or note how you might pass kindness on.
 
-Other screens include a **home** overview and **settings** (for example account and display options).
+The app also includes a **home** overview and **settings** (for example account and display options).
 
-## How to access the app
+## How to get the app
 
-Whether you need this section depends on who reads the README:
+Install or download options are provided **with each release** (for example an app store page or file shared by the project). Use the channel indicated in the materials you received.
 
-- **General visitors (GitHub, portfolio):** Yes—say clearly if the app is **on the Play Store / App Store**, or share a **public install link** (e.g. internal testing, APK/IPA download, or TestFlight). If it is **not published**, say so in one sentence and how you can share a build on request (thesis marker, school, etc.).
-- **Only thesis markers / your school:** A short note is enough: where the install file lives (e.g. appendix, LMS, email) and whether a **test account** is required.
+## If you need help right away
 
-This repo does **not** include full developer setup here; keep access instructions **short** and replace the placeholders below when you have real links.
-
-| Status | What to put here |
-|--------|-------------------|
-| Published | Store links + optional short “what you need” (e.g. internet for AI coach). |
-| Not published | “Not on public stores yet.” + how evaluators get the build + any test login. |
-
-**Placeholders (edit before sharing widely):**
-
-- **Install:** *[Add Google Play / App Store URL, or “available on request from the author.”]*  
-- **Requirements:** *[e.g. Android version; network for cloud features; optional note that some features need a configured backend.]*
-
-## Important limitations
-
-- The app is **educational and preventive**. It is **not** an emergency or mental-health service.
-- If you or someone you know may be in danger or thinking about self-harm, **contact a trusted adult** and use **real crisis lines**, for example in Hong Kong:
+- The app is **not** an emergency or mental-health service.
+- If you or someone you know may be in danger or thinking about self-harm, **talk to a trusted adult** and use **real crisis lines**, for example in Hong Kong:
   - **Samaritan Befrienders Hong Kong:** 2389 2222 (24 hours)
   - **Lifeline:** 2896 0000
 
 Do not rely on this app for immediate safety or professional treatment.
 
-## Privacy and data (general)
+## Privacy
 
-Account sign-in and app behaviour may process data according to how the published version is configured. For any public release, a separate privacy notice should describe what is collected, why, and how users can ask questions.
-
----
-
-*Student project rooted in positive education research and local student needs.*
+How sign-in and other data are used depends on the **specific version** you install. Read the **privacy notice** supplied with that release.
