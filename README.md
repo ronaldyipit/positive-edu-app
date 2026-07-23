@@ -67,3 +67,24 @@ If you wish to run this project locally, follow these steps:
    ```bash
    git clone https://github.com/ronaldyipit/positive-edu-app.git
    cd positive-edu-app
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+
+3. **Environment Variables:**
+   Create a .env file in the root directory and add your Firebase and API configurations:
+   ```env
+   EXPO_PUBLIC_FIREBASE_API_KEY=your_api_key
+   EXPO_PUBLIC_BACKEND_URL=your_backend_url
+
+4. **Run the app:**
+   ```bash
+   npx expo start
+
+## 🛡️ Safety & Ethics
+
+PosiGlow is designed for educational, non-clinical capacity building. It includes a Crisis Intervention Protocol: a sensitive keyword detection system that triggers a mandatory pop-up with local emergency hotlines (e.g., Samaritan Befrienders) and suspends standard AI replies if extreme emotional distress is detected.
+
+## 👨‍💻 Author
+YIP Tsun Sing
