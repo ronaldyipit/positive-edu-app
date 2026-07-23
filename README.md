@@ -1,29 +1,69 @@
-# 正發光 (PosiGlow)
+# PosiGlow (正發光) 🌱
 
-**正發光** is a mobile well-being companion for **Hong Kong secondary school students**. It is built around ideas from **positive education** and the **PERMA+H** framework (positive emotions, engagement, relationships, meaning, accomplishment, and health). The app supports everyday reflection, focus, and emotional regulation. It is **not** a substitute for counselling or clinical care.
+> An AI-Assisted Positive Education Mobile Application for Secondary School Students in Hong Kong.
 
-## What you can do in the app
+PosiGlow is a proactive, stigma-free mobile application built on the Geelong Grammar School (GGS) Positive Education model (**PERMA+H**). Designed specifically for Hong Kong secondary students, it transitions from a traditional, reactive medical model of care to a preventive, asset-based approach to mental well-being.
 
-- **正向教練 (AI chat)** — Chat with an AI coach that encourages a strengths-based, reflective style of thinking. It does not diagnose conditions or give clinical advice.
-- **離線深潛** — A focus timer for deep work or study, with simple rewards (experience points and levels) to mark progress.
-- **紓壓碎紙** — Write down a worry, use a light “shred” ritual, then follow a short breathing animation to help the body settle.
-- **感恩 · 火炬傳暖** — Practise gratitude: thank someone in words, plan a kind action, or note how you might pass kindness on.
+## ✨ Core Features
 
-The app also includes a **home** overview and **settings** (for example account and display options).
+The application translates empirically validated Positive Psychology Interventions (PPIs) into four engaging digital micro-behaviors:
 
-## How to get the app
+1. **AI Positive Mindset Coach (正向教練)** 🤖
+   - A brief, strengths-aware coaching dialogue interface.
+   - Grounded in Strengths-Based Interventions and Cognitive Reframing to enhance self-efficacy.
+   - *PERMA+H Alignment: Meaning (M)*
 
-Install or download options are provided **with each release** (for example an app store page or file shared by the project). Use the channel indicated in the materials you received.
+2. **Flow Focus Timer (離線深潛)** ⏳
+   - An offline-friendly focus session with an XP reward system for completed runs.
+   - Based on Flow Theory and time-boxing techniques to reduce cognitive fatigue and digital distraction.
+   - *PERMA+H Alignment: Engagement (E), Accomplishment (A)*
 
-## If you need help right away
+3. **Stress Shredder (紓壓碎紙)** 📱
+   - Users write down a stressor, physically shake their phone to "shred" it, followed by a paced 4-7-8 breathing exercise.
+   - Integrates Expressive Writing with Somatic Regulation to lower acute anxiety.
+   - *PERMA+H Alignment: Positive Emotions (P), Health (H)*
 
-- The app is **not** an emergency or mental-health service.
-- If you or someone you know may be in danger or thinking about self-harm, **talk to a trusted adult** and use **real crisis lines**, for example in Hong Kong:
-  - **Samaritan Befrienders Hong Kong:** 2389 2222 (24 hours)
-  - **Lifeline:** 2896 0000
+4. **Gratitude / Kindness Relay (火炬傳暖)** 🤝
+   - A module to compose and share gratitude-oriented messages and actions.
+   - Derived from Gratitude Journaling and prosocial interventions to improve interpersonal connectedness.
+   - *PERMA+H Alignment: Relationships (R)*
 
-Do not rely on this app for immediate safety or professional treatment.
+## 🏗️ System Architecture
 
-## Privacy
+PosiGlow utilizes a mobile-backend approach to ensure security, scalability, and seamless updates. 
 
-How sign-in and other data are used depends on the **specific version** you install. Read the **privacy notice** supplied with that release.
+![System Architecture](./docs/architecture.png)
+*(Note: Ensure the image file is uploaded to the `/docs/` folder in your repository for this link to work.)*
+
+## 💻 Tech Stack
+
+**Frontend (Client)**
+* **Framework:** React Native / Expo
+* **State Management:** Local State / Context API
+* **UI/UX:** Tailored for Traditional Chinese (zh-Hant) users with a gamified interface.
+
+**Backend (Server)**
+* **Environment:** Node.js with Express
+* **Authentication:** Firebase Authentication
+* **AI Integration:** LLM integration (Poe API) with a Retrieval-Augmented Generation (RAG) pipeline to inject pre-chunked Positive Education snippets and prevent hallucinations.
+
+**Deployment & DevOps**
+* **OTA Updates:** Expo Application Services (EAS) Update
+* **Runtime:** Hermes (Android build optimization)
+
+## 🚀 Getting Started (Local Development)
+
+If you wish to run this project locally, follow these steps:
+
+### Prerequisites
+* Node.js installed
+* Expo CLI installed (`npm install -g expo-cli`)
+* Firebase account setup
+* API Keys for the LLM backend
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/ronaldyipit/positive-edu-app.git
+   cd positive-edu-app
