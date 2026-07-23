@@ -32,7 +32,7 @@ The application translates empirically validated Positive Psychology Interventio
 
 PosiGlow utilizes a mobile-backend approach to ensure security, scalability, and seamless updates. 
 
-![System Architecture](./docs/architecture.png)
+![System Architecture](./docs/posiglow_architecture.png)
 
 ## 💻 Tech Stack
 
